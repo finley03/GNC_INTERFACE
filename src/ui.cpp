@@ -459,7 +459,7 @@ void UI_DataPolling() {
 		// static bool to show if button has been pressed while not connected to port
 		static bool notConnectedAttempt = false;
 
-		static uint8_t pollWriteBuffer[] = { 0x81 };
+		uint16_t pollWriteBuffer = 0x0081;
 
 		if (ImGui::Button(pollButtonText)) {
 			// run if port is open
@@ -469,7 +469,7 @@ void UI_DataPolling() {
 				if (continuousPoll) {
 					// if currently not polling and port is open
 					if (!serial.get_pollState()) {
-						serial.start_pollthread(pollWriteBuffer, 1, nav_data_packet.reg, sizeof(nav_data_packet.reg), true);
+						serial.start_pollthread(pollWriteBuffer, nav_data_packet.reg, sizeof(nav_data_packet.reg), true);
 					}
 					else {
 						serial.join_pollthread();
@@ -479,7 +479,7 @@ void UI_DataPolling() {
 				else {
 					// start thread if not running
 					if (!serial.get_pollState() && !serial.get_pollDone()) {
-						serial.start_pollthread(pollWriteBuffer, 1, nav_data_packet.reg, sizeof(nav_data_packet.reg), false);
+						serial.start_pollthread(pollWriteBuffer, nav_data_packet.reg, sizeof(nav_data_packet.reg), false);
 					}
 				}
 			}
@@ -525,7 +525,7 @@ void UI_DataPolling() {
 		// bool true if user attempts to poll while continuous polling operation is happening
 		static bool warnOtherPollEvents = false;
 
-		static uint8_t pollWriteBuffer[] = { 0x80 };
+		uint16_t pollWriteBuffer = 0x0080;
 
 		if (ImGui::Button("Poll Data##2")) {
 			if (serial.get_status()) {
@@ -533,7 +533,7 @@ void UI_DataPolling() {
 
 				// start if thread is not running
 				if (!serial.get_pollState() && !serial.get_pollDone()) {
-					serial.start_pollthread(pollWriteBuffer, 1, nav_selftest_packet.reg, sizeof(nav_selftest_packet.reg), false);
+					serial.start_pollthread(pollWriteBuffer, nav_selftest_packet.reg, sizeof(nav_selftest_packet.reg), false);
 					warnOtherPollEvents = false;
 				}
 				else {

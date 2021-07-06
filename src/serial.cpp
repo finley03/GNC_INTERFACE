@@ -163,18 +163,18 @@ Serial::~Serial() {
 
 
 
-bool Serial::start_pollthread(uint8_t* write_buffer, uint32_t nr_write, uint8_t* read_buffer, uint32_t nr_read, bool continuous) {
+bool Serial::start_pollthread(uint16_t command, uint8_t* read_buffer, uint32_t nr_read, bool continuous) {
 	if (!serialthread_open && port_open) {
-		this->write_buffer = write_buffer;
-		this->nr_write = nr_write;
-		this->read_buffer = read_buffer;
-		this->nr_read = nr_read;
+		//this->write_buffer = write_buffer;
+		//this->nr_write = nr_write;
+		//this->read_buffer = read_buffer;
+		//this->nr_read = nr_read;
 		if (continuous) {
-			serialthread = std::thread(&Serial::continuous_poll, this);
+			serialthread = std::thread(&Serial::continuous_poll, this, command, read_buffer, nr_read);
 			pollthread_continuous = true;
 		}
 		else {
-			serialthread = std::thread(&Serial::single_poll, this);
+			serialthread = std::thread(&Serial::single_poll, this, command, read_buffer, nr_read);
 			pollthread_continuous = false;
 		}
 		return true;
@@ -236,20 +236,28 @@ bool Serial::get_pollContinuous() {
 }
 
 
-void Serial::single_poll() {
+void Serial::single_poll(uint16_t command, uint8_t* read_buffer, uint32_t nr_read) {
 	// set serialthread_open flag to true
 	serialthread_open = true;
 
+	Transfer_Request request = createTransferRequest(command);
+
 	// poll data from processor
-	write(write_buffer, nr_write);
+	write(request.reg, sizeof(request.reg));
 	read(read_buffer, nr_read);
+
+	if (crc32(nav_data_packet.reg, sizeof(nav_data_packet.reg)) != CRC32_CHECK) {
+		std::cout << "CRC fail\n";
+	}
 
 	serialthread_done = true;
 }
 
-void Serial::continuous_poll() {
+void Serial::continuous_poll(uint16_t command, uint8_t* read_buffer, uint32_t nr_read) {
 	// set serialthread_open flag true
 	serialthread_open = true;
+
+	Transfer_Request request = createTransferRequest(command);
 
 	Timer threadTimer;
 
@@ -258,7 +266,7 @@ void Serial::continuous_poll() {
 		// operation fails close the port
 		// the rest of the program will recognise the closed
 		// port
-		if (!write(write_buffer, nr_write)) close();
+		if (!write(request.reg, sizeof(request.reg))) close();
 		if (!read(read_buffer, nr_read)) close();
 
 		threadTimer.setFrameCap(rate);
@@ -271,8 +279,9 @@ void Serial::eeprom_write_data(uint32_t address, uint8_t data) {
 	// set serialthread_open flag to true
 	serialthread_open = true;
 
-	uint8_t command = 0x41;
-	write(&command, 1);
+	static Transfer_Request request = createTransferRequest(0x0041);
+
+	write(request.reg, sizeof(request.reg));
 	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
 	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
 		EEPROM_Write_Request eeprom_write_request;
@@ -293,8 +302,9 @@ void Serial::eeprom_read_data(uint32_t address, uint8_t* writeback) {
 	// set serialthread_open flag to true
 	serialthread_open = true;
 
-	uint8_t command = 0x40;
-	write(&command, 1);
+	static Transfer_Request request = createTransferRequest(0x0040);
+
+	write(request.reg, sizeof(request.reg));
 	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
 	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
 		EEPROM_Read_Request eeprom_read_request;
@@ -312,4 +322,13 @@ void Serial::eeprom_read_data(uint32_t address, uint8_t* writeback) {
 	}
 
 	serialthread_done = true;
+}
+
+
+Transfer_Request Serial::createTransferRequest(uint16_t command) {
+	Transfer_Request request;
+	request.bit.header = TRANSFER_REQUEST_HEADER;
+	request.bit.command = command;
+	request.bit.crc = crc32(request.reg, sizeof(request.reg) - 4);
+	return request;
 }

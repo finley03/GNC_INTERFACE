@@ -12,68 +12,6 @@
 #include "util.h"
 
 
-class Serial {
-private:
-	char* port = nullptr;
-	uint32_t baud = NULL;
-
-	HANDLE port_handle;
-
-	bool port_open = false;
-
-	std::thread serialthread;
-	bool serialthread_open = false;
-	// variable turns true when poll is finished
-	bool serialthread_done = false;
-	// variable true if continuously polling
-	bool pollthread_continuous = true;
-
-	// cannot pass variables from local stack to thread so I'll just
-	// put them in the class
-	uint8_t* write_buffer;
-	uint32_t nr_write;
-	uint8_t* read_buffer;
-	uint32_t nr_read;
-	float rate = 10;
-	void single_poll();
-	void continuous_poll();
-	void eeprom_write_data(uint32_t address, uint8_t data);
-	void eeprom_read_data(uint32_t address, uint8_t* writeback);
-public:
-	bool open_port(const char* port, uint32_t baud);
-
-	bool set_baud(uint32_t baud);
-	bool get_status();
-	uint32_t get_baud();
-
-	bool read(uint8_t* buffer, uint32_t nr_bytes);
-	bool write(uint8_t* buffer, uint32_t nr_bytes);
-	void close();
-
-	bool start_pollthread(uint8_t* write_buffer, uint32_t nr_write, uint8_t* read_buffer, uint32_t nr_read, bool continuous);
-	bool start_eepromwritethread(uint32_t address, uint8_t data);
-	bool start_eepromreadthread(uint32_t address, uint8_t* writeback);
-	void join_pollthread();
-
-	void set_pollRate(float rate);
-	float get_pollRate();
-	// returns true if pollthread is running
-	bool get_pollState();
-	// returns true if pollthread has finished task
-	bool get_pollDone();
-	// returns true if last thread was continuous poll
-	bool get_pollContinuous();
-
-	// destructor calls close function
-	~Serial();
-};
-
-
-// global serial object
-extern Serial serial;
-
-
-
 typedef struct { // aligned is for CRC calculation
 	uint16_t device_id;
 
@@ -161,6 +99,25 @@ typedef union {
 } NAV_Selftest_Packet;
 
 
+#define TRANSFER_REQUEST_HEADER 0x0003
+
+// packet sent by computer to request transfer
+typedef struct {
+	uint16_t header;
+
+	uint16_t command;
+
+	uint32_t crc;
+} Transfer_Request_Type;
+
+
+typedef union {
+	Transfer_Request_Type bit;
+
+	uint8_t reg[sizeof(Transfer_Request_Type)];
+} Transfer_Request;
+
+
 #define CTRL_ACK_OK 0x0000
 #define CTRL_ACK_ERROR 0xffff
 
@@ -238,6 +195,69 @@ typedef union {
 
 extern NAV_Data_Packet nav_data_packet;
 extern NAV_Selftest_Packet nav_selftest_packet;
+
+
+class Serial {
+private:
+	char* port = nullptr;
+	uint32_t baud = NULL;
+
+	HANDLE port_handle;
+
+	bool port_open = false;
+
+	std::thread serialthread;
+	bool serialthread_open = false;
+	// variable turns true when poll is finished
+	bool serialthread_done = false;
+	// variable true if continuously polling
+	bool pollthread_continuous = true;
+
+	// cannot pass variables from local stack to thread so I'll just
+	// put them in the class
+	//uint8_t* write_buffer;
+	//uint32_t nr_write;
+	//uint8_t* read_buffer;
+	//uint32_t nr_read;
+	float rate = 10;
+	void single_poll(uint16_t command, uint8_t* read_buffer, uint32_t nr_read);
+	void continuous_poll(uint16_t command, uint8_t* read_buffer, uint32_t nr_read);
+	void eeprom_write_data(uint32_t address, uint8_t data);
+	void eeprom_read_data(uint32_t address, uint8_t* writeback);
+
+	Transfer_Request createTransferRequest(uint16_t command);
+public:
+	bool open_port(const char* port, uint32_t baud);
+
+	bool set_baud(uint32_t baud);
+	bool get_status();
+	uint32_t get_baud();
+
+	bool read(uint8_t* buffer, uint32_t nr_bytes);
+	bool write(uint8_t* buffer, uint32_t nr_bytes);
+	void close();
+
+	bool start_pollthread(uint16_t command, uint8_t* read_buffer, uint32_t nr_read, bool continuous);
+	bool start_eepromwritethread(uint32_t address, uint8_t data);
+	bool start_eepromreadthread(uint32_t address, uint8_t* writeback);
+	void join_pollthread();
+
+	void set_pollRate(float rate);
+	float get_pollRate();
+	// returns true if pollthread is running
+	bool get_pollState();
+	// returns true if pollthread has finished task
+	bool get_pollDone();
+	// returns true if last thread was continuous poll
+	bool get_pollContinuous();
+
+	// destructor calls close function
+	~Serial();
+};
+
+
+// global serial object
+extern Serial serial;
 
 
 #endif
