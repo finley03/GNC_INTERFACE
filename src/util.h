@@ -6,6 +6,11 @@
 #include <sstream>
 #include <iostream>
 
+#if defined(_MSC_VER) && !defined(_CRT_SECURE_NO_WARNINGS)
+#define _CRT_SECURE_NO_WARNINGS
+#pragma warning (disable: 4996)
+#endif
+
 int readFileToString(const char* filePath, std::string& writeback);
 
 constexpr uint32_t CRC32_POLY = 0xEDB88320;

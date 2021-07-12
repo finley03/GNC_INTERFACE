@@ -66,7 +66,7 @@ int main(int argc, char* argv[]) {
 	grid = &localgrid;
 
 
-	std::cout << sizeof(nav_selftest_packet.reg) << "\n";
+	std::cout << sizeof(CTRL_Set_Vec3) << "\n";
 
 
 	bool run = true;

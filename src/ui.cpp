@@ -7,6 +7,7 @@ void UI_Rendering(unsigned int& mainObject);
 void UI_Model(unsigned int& mainObject);
 void UI_SerialPorts();
 void UI_DataPolling();
+void UI_Parameters();
 void UI_EEPROM();
 
 // for telemetry menu
@@ -21,6 +22,8 @@ void UI_TableHex8(const char* text, uint8_t a);
 void UI_TableHex16(const char* text, uint16_t a);
 void UI_TableHex32(const char* text, uint32_t a);
 void UI_TableTestInt(const char* text, uint8_t code);
+
+void UI_CTRLVec3TreeNode(const char* text, CTRL_Param parameter, float* value);
 
 
 void UI_Run(SDL_Window* window, unsigned int& mainObject) {
@@ -117,6 +120,7 @@ void UI_MainMenu(SDL_Window* window, unsigned int& mainObject, bool* p_open) {
 	UI_Rendering(mainObject);
 	UI_SerialPorts();
 	UI_DataPolling();
+	UI_Parameters();
 	UI_EEPROM();
 
 	// close poll thread
@@ -446,13 +450,13 @@ void UI_DataPolling() {
 		}
 
 		// if continuously polling and continuous poll checkbox unchecked stop
-		if (!continuousPoll && serial.get_pollState() && serial.get_pollContinuous()) {
+		if (!continuousPoll && serial.get_continuousState()) {
 			serial.join_pollthread();
 		}
 
 		// change button text if running continuously
 		const char* pollButtonText = "Poll Data##1";
-		if (continuousPoll && serial.get_pollState() && serial.get_pollContinuous()) {
+		if (continuousPoll && serial.get_continuousState()) {
 			pollButtonText = "Stop Polling";
 		}
 
@@ -468,11 +472,11 @@ void UI_DataPolling() {
 				// continuous polling
 				if (continuousPoll) {
 					// if currently not polling and port is open
-					if (!serial.get_pollState()) {
+					if (!serial.get_continuousState()) {
 						serial.start_pollthread(pollWriteBuffer, nav_data_packet.reg, sizeof(nav_data_packet.reg), true);
 					}
 					else {
-						serial.join_pollthread();
+						serial.join_continuousthread();
 					}
 				}
 				// single poll
@@ -494,8 +498,9 @@ void UI_DataPolling() {
 		}
 
 		// if port disconnects but pollthread is running close.
-		if (!serial.get_status() && serial.get_pollState()) {
+		if (!serial.get_status() && (serial.get_pollState() || serial.get_continuousState())) {
 			serial.join_pollthread();
+			serial.join_continuousthread();
 			notConnectedAttempt = true;
 		}
 
@@ -569,6 +574,23 @@ void UI_DataPolling() {
 
 	ImGui::Spacing();
 
+}
+
+
+void UI_Parameters() {
+	if (!ImGui::CollapsingHeader("Parameters")) return;
+
+	ImGui::Text("CTRL Processor");
+	ImGui::Spacing();
+
+	static float pid_x_val[3];
+	UI_CTRLVec3TreeNode("PID_X", _PID_X, pid_x_val);
+
+	static float pid_y_val[3];
+	UI_CTRLVec3TreeNode("PID_Y", _PID_Y, pid_y_val);
+
+	static float pid_z_val[3];
+	UI_CTRLVec3TreeNode("PID_Z", _PID_Z, pid_z_val);
 }
 
 
@@ -922,4 +944,20 @@ void UI_TableTestInt(const char* text, uint8_t code) {
 	ImGui::Text(text);
 	ImGui::TableSetColumnIndex(1);
 	ImGui::Text((code == 0) ? "PASS" : "FAIL");
+}
+
+
+void UI_CTRLVec3TreeNode(const char* text, CTRL_Param parameter, float* value) {
+	char buffer[32];
+	sprintf(buffer, "%s##param", text);
+	if (ImGui::TreeNode(buffer)) {
+		sprintf(buffer, "value##%sparam", text);
+		ImGui::InputFloat3(buffer, value);
+		sprintf(buffer, "apply##%sparam", text);
+		if (ImGui::Button(buffer)) {
+			serial.start_vec3setthread(parameter, value);
+		}
+
+		ImGui::TreePop();
+	}
 }

@@ -12,6 +12,13 @@
 #include "util.h"
 
 
+typedef enum {
+	_PID_X,
+	_PID_Y,
+	_PID_Z
+} CTRL_Param;
+
+
 typedef struct { // aligned is for CRC calculation
 	uint16_t device_id;
 
@@ -174,6 +181,25 @@ typedef union {
 } EEPROM_Read_Request;
 
 
+#define EEPROM_READ_N_REQUEST_HEADER 0x0004
+
+typedef struct {
+	uint16_t header;
+
+	uint8_t size;
+	uint32_t address;
+
+	uint32_t crc;
+} EEPROM_Read_N_Request_type;
+
+
+typedef union {
+	EEPROM_Read_N_Request_type bit;
+
+	uint8_t reg[sizeof(EEPROM_Read_N_Request_type)];
+} EEPROM_Read_N_Request;
+
+
 #define EEPROM_WRITE_REQUEST_HEADER 0x0002
 
 typedef struct {
@@ -193,6 +219,47 @@ typedef union {
 } EEPROM_Write_Request;
 
 
+#define EEPROM_WRITE_N_REQUEST_HEADER 0x0005
+
+typedef struct {
+	uint16_t header;
+
+	uint8_t size;
+	uint32_t address;
+	uint8_t data[64];
+
+	uint32_t crc;
+} EEPROM_Write_N_Request_Type;
+
+
+typedef union {
+	EEPROM_Write_N_Request_Type bit;
+
+	uint8_t reg[sizeof(EEPROM_Write_N_Request_Type)];
+} EEPROM_Write_N_Request;
+
+
+#define CTRL_SET_VEC3_HEADER 0x0006
+
+//#pragma pack(push, 1)
+typedef struct {
+	uint16_t header;
+
+	uint16_t parameter; // cast from CTRL_Param
+	float data[3];
+
+	uint32_t crc;
+} CTRL_Set_Vec3_Type;
+//#pragma pack(pop)
+
+
+typedef union {
+	CTRL_Set_Vec3_Type bit;
+
+	uint8_t reg[sizeof(CTRL_Set_Vec3_Type)];
+} CTRL_Set_Vec3;
+
+
 extern NAV_Data_Packet nav_data_packet;
 extern NAV_Selftest_Packet nav_selftest_packet;
 
@@ -207,11 +274,17 @@ private:
 	bool port_open = false;
 
 	std::thread serialthread;
+	std::thread continuousthread;
 	bool serialthread_open = false;
+	bool continuousthread_open = false;
 	// variable turns true when poll is finished
 	bool serialthread_done = false;
+	bool continuousthread_done = false;
 	// variable true if continuously polling
 	bool pollthread_continuous = true;
+
+	bool timerequest = false;
+	bool timereturned = false;
 
 	// cannot pass variables from local stack to thread so I'll just
 	// put them in the class
@@ -224,8 +297,13 @@ private:
 	void continuous_poll(uint16_t command, uint8_t* read_buffer, uint32_t nr_read);
 	void eeprom_write_data(uint32_t address, uint8_t data);
 	void eeprom_read_data(uint32_t address, uint8_t* writeback);
+	void ctrl_set_vec3(CTRL_Param parameter, float* value);
 
 	Transfer_Request createTransferRequest(uint16_t command);
+
+	// functions for single actions to share port time with continuous actions
+	void timeRequest();
+	void timeReturn();
 public:
 	bool open_port(const char* port, uint32_t baud);
 
@@ -240,16 +318,19 @@ public:
 	bool start_pollthread(uint16_t command, uint8_t* read_buffer, uint32_t nr_read, bool continuous);
 	bool start_eepromwritethread(uint32_t address, uint8_t data);
 	bool start_eepromreadthread(uint32_t address, uint8_t* writeback);
+	bool start_vec3setthread(CTRL_Param parameter, float* value);
 	void join_pollthread();
+	void join_continuousthread();
 
 	void set_pollRate(float rate);
 	float get_pollRate();
 	// returns true if pollthread is running
 	bool get_pollState();
+	bool get_continuousState();
 	// returns true if pollthread has finished task
 	bool get_pollDone();
 	// returns true if last thread was continuous poll
-	bool get_pollContinuous();
+	//bool get_pollContinuous();
 
 	// destructor calls close function
 	~Serial();

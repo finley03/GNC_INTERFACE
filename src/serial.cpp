@@ -170,7 +170,7 @@ bool Serial::start_pollthread(uint16_t command, uint8_t* read_buffer, uint32_t n
 		//this->read_buffer = read_buffer;
 		//this->nr_read = nr_read;
 		if (continuous) {
-			serialthread = std::thread(&Serial::continuous_poll, this, command, read_buffer, nr_read);
+			continuousthread = std::thread(&Serial::continuous_poll, this, command, read_buffer, nr_read);
 			pollthread_continuous = true;
 		}
 		else {
@@ -203,6 +203,16 @@ bool Serial::start_eepromreadthread(uint32_t address, uint8_t* writeback) {
 	return false;
 }
 
+bool Serial::start_vec3setthread(CTRL_Param parameter, float* value) {
+	if (!serialthread_open && port_open) {
+		serialthread = std::thread(&Serial::ctrl_set_vec3, this, parameter, value);
+
+		return true;
+	}
+
+	return false;
+}
+
 
 void Serial::join_pollthread() {
 	if (serialthread_open) {
@@ -211,6 +221,15 @@ void Serial::join_pollthread() {
 		serialthread_open = false;
 		serialthread.join();
 		serialthread_done = false;
+	}
+}
+
+
+void Serial::join_continuousthread() {
+	if (continuousthread_open) {
+		continuousthread_open = false;
+		continuousthread.join();
+		continuousthread_done = false;
 	}
 }
 
@@ -227,13 +246,17 @@ bool Serial::get_pollState() {
 	return serialthread_open;
 }
 
+bool Serial::get_continuousState() {
+	return continuousthread_open;
+}
+
 bool Serial::get_pollDone() {
 	return serialthread_done;
 }
 
-bool Serial::get_pollContinuous() {
-	return pollthread_continuous;
-}
+//bool Serial::get_pollContinuous() {
+//	return pollthread_continuous;
+//}
 
 
 void Serial::single_poll(uint16_t command, uint8_t* read_buffer, uint32_t nr_read) {
@@ -246,23 +269,25 @@ void Serial::single_poll(uint16_t command, uint8_t* read_buffer, uint32_t nr_rea
 	write(request.reg, sizeof(request.reg));
 	read(read_buffer, nr_read);
 
-	if (crc32(nav_data_packet.reg, sizeof(nav_data_packet.reg)) != CRC32_CHECK) {
-		std::cout << "CRC fail\n";
-	}
-
 	serialthread_done = true;
 }
 
 void Serial::continuous_poll(uint16_t command, uint8_t* read_buffer, uint32_t nr_read) {
 	// set serialthread_open flag true
-	serialthread_open = true;
+	continuousthread_open = true;
 
 	Transfer_Request request = createTransferRequest(command);
 
 	Timer threadTimer;
 
 	// continuous polling loop
-	while (serialthread_open) {
+	while (continuousthread_open) {
+		if (timerequest) {
+			timerequest = false;
+			while (!timereturned);
+			timereturned = false;
+		}
+
 		// operation fails close the port
 		// the rest of the program will recognise the closed
 		// port
@@ -278,6 +303,8 @@ void Serial::continuous_poll(uint16_t command, uint8_t* read_buffer, uint32_t nr
 void Serial::eeprom_write_data(uint32_t address, uint8_t data) {
 	// set serialthread_open flag to true
 	serialthread_open = true;
+
+	timeRequest();
 
 	static Transfer_Request request = createTransferRequest(0x0041);
 
@@ -296,11 +323,14 @@ void Serial::eeprom_write_data(uint32_t address, uint8_t data) {
 	}
 
 	serialthread_done = true;
+	timeReturn();
 }
 
 void Serial::eeprom_read_data(uint32_t address, uint8_t* writeback) {
 	// set serialthread_open flag to true
 	serialthread_open = true;
+
+	timeRequest();
 
 	static Transfer_Request request = createTransferRequest(0x0040);
 
@@ -322,6 +352,36 @@ void Serial::eeprom_read_data(uint32_t address, uint8_t* writeback) {
 	}
 
 	serialthread_done = true;
+	timeReturn();
+}
+
+void Serial::ctrl_set_vec3(CTRL_Param parameter, float* value) {
+	// set serialthread_open flag to true
+	serialthread_open = true;
+
+	timeRequest();
+
+	static Transfer_Request request = createTransferRequest(0x0044);
+
+	write(request.reg, sizeof(request.reg));
+	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+		CTRL_Set_Vec3 set_request;
+		set_request.bit.header = CTRL_SET_VEC3_HEADER;
+		set_request.bit.parameter = (uint16_t) parameter;
+		set_request.bit.data[0] = value[0];
+		set_request.bit.data[1] = value[1];
+		set_request.bit.data[2] = value[2];
+		set_request.bit.crc = crc32(set_request.reg, sizeof(set_request.reg) - 4);
+		write(set_request.reg, sizeof(set_request.reg));
+		printf("0x%04x\n0x%08x\n0x%08x\n", set_request.bit.header, set_request.bit.crc, crc32(set_request.reg, sizeof(set_request.reg)));
+	}
+	else {
+		std::cout << "Bad response\n";
+	}
+
+	serialthread_done = true;
+	timeReturn();
 }
 
 
@@ -331,4 +391,21 @@ Transfer_Request Serial::createTransferRequest(uint16_t command) {
 	request.bit.command = command;
 	request.bit.crc = crc32(request.reg, sizeof(request.reg) - 4);
 	return request;
+}
+
+
+void Serial::timeRequest() {
+	if (continuousthread_open) {
+		// set to true
+		timerequest = true;
+		// wait until reset
+		while (timerequest);
+	}
+}
+
+
+void Serial::timeReturn() {
+	if (continuousthread_open) {
+		timereturned = true;
+	}
 }
