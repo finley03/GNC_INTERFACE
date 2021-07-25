@@ -203,6 +203,14 @@ void UI_Rendering(unsigned int& mainObject) {
 	ImGui::Checkbox("Show Grid##rendering", &showGrid);
 
 	grid->show = showGrid;
+	static float gridHeight = 0;
+	if (showGrid) {
+		if (ImGui::InputFloat("Grid Height##rendering", &gridHeight, NULL, NULL, "%.1f", inputflags)) {
+			float gridPosition[3] = { 0, gridHeight, 0 };
+			grid->setPosition(gridPosition);
+			grid->calculateModelMatrix();
+		}
+	}
 
 	ImGui::Spacing();
 	ImGui::Separator();
@@ -289,7 +297,7 @@ void UI_Model(unsigned int& mainObject) {
 		// position needs to be translated from NORTH EAST DOWN frame
 		// to EAST UP SOUTH frame
 		modelPosition[0] = data.position_y;
-		modelPosition[1] = -data.position_z - 20;
+		modelPosition[1] = -data.position_z; // - 20
 		modelPosition[2] = -data.position_x;
 		objects->setPosition(mainObject, modelPosition);
 	}

@@ -64,8 +64,10 @@ bool  Serial::open_port(const char* port, uint32_t baud) {
 
 	// create port timeout structure
 	COMMTIMEOUTS port_timeout;
-	// wait 5ms between bytes
-	port_timeout.ReadIntervalTimeout = 5;
+	// wait 20ms between bytes
+	// WARNING this value is sensitive to baud rate
+	// low baud rates will likely require a higher value
+	port_timeout.ReadIntervalTimeout = 20;
 	// ignore all other parameters
 	port_timeout.ReadTotalTimeoutMultiplier = 0;
 	port_timeout.ReadTotalTimeoutConstant = 1000;
@@ -129,6 +131,9 @@ bool Serial::read(uint8_t* buffer, uint32_t nr_bytes) {
 		printf("Error reading data from port\n");
 		return false;
 	}
+
+	printf("Read %d/%d bytes\n", bytes, nr_bytes);
+
 	return true;
 	//return static_cast<uint32_t>(bytes);
 }
@@ -374,7 +379,7 @@ void Serial::ctrl_set_vec3(CTRL_Param parameter, float* value) {
 		set_request.bit.data[2] = value[2];
 		set_request.bit.crc = crc32(set_request.reg, sizeof(set_request.reg) - 4);
 		write(set_request.reg, sizeof(set_request.reg));
-		printf("0x%04x\n0x%08x\n0x%08x\n", set_request.bit.header, set_request.bit.crc, crc32(set_request.reg, sizeof(set_request.reg)));
+		//printf("0x%04x\n0x%08x\n0x%08x\n", set_request.bit.header, set_request.bit.crc, crc32(set_request.reg, sizeof(set_request.reg)));
 	}
 	else {
 		std::cout << "Bad response\n";
