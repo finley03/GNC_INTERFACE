@@ -7,6 +7,7 @@ void UI_Rendering(unsigned int& mainObject);
 void UI_Model(unsigned int& mainObject);
 void UI_SerialPorts();
 void UI_DataPolling();
+void UI_Commands();
 void UI_Parameters();
 void UI_EEPROM();
 
@@ -23,7 +24,8 @@ void UI_TableHex16(const char* text, uint16_t a);
 void UI_TableHex32(const char* text, uint32_t a);
 void UI_TableTestInt(const char* text, uint8_t code);
 
-void UI_CTRLVec3TreeNode(const char* text, CTRL_Param parameter, float* value);
+void UI_Vec3TreeNode(const char* text, CTRL_Param parameter, float* value, bool enableWrite = false, const char* format = "%.3f");
+void UI_ScalarTreeNode(const char* text, CTRL_Param parameter, float* value, bool enableWrite = false, const char* format = "%.3f");
 
 
 void UI_Run(SDL_Window* window, unsigned int& mainObject) {
@@ -120,6 +122,7 @@ void UI_MainMenu(SDL_Window* window, unsigned int& mainObject, bool* p_open) {
 	UI_Rendering(mainObject);
 	UI_SerialPorts();
 	UI_DataPolling();
+	UI_Commands();
 	UI_Parameters();
 	UI_EEPROM();
 
@@ -585,20 +588,106 @@ void UI_DataPolling() {
 }
 
 
+void UI_Commands() {
+	if (!ImGui::CollapsingHeader("Commands")) return;
+
+	ImGui::Text("Control Processor");
+	ImGui::Separator();
+	ImGui::Spacing();
+
+	if (ImGui::Button("Enable NAV computer polling")) serial.start_sendcommand(0x0000);
+	if (ImGui::Button("Disable NAV computer polling")) serial.start_sendcommand(0x0001);
+	if (ImGui::Button("Reset Processor##control")) serial.start_sendcommand(0x007F);
+
+	ImGui::Spacing();
+	ImGui::Text("Navigation Processor");
+	ImGui::Separator();
+	ImGui::Spacing();
+
+	if (ImGui::Button("Calibrate magnetometer")) serial.start_sendcommand(0x0082);
+	ImGui::SameLine();
+	ImGui::Text("(Disables NAV computer polling)");
+	if (ImGui::Button("Reset Processor##navigation")) serial.start_sendcommand(0x00FF);
+
+	ImGui::Spacing();
+}
+
+
 void UI_Parameters() {
 	if (!ImGui::CollapsingHeader("Parameters")) return;
 
+	static bool enableWriting = false;
+	ImGui::Checkbox("Enable Writing##parameters", &enableWriting);
+	ImGui::Spacing;
+
+	ImGui::Separator();
 	ImGui::Text("CTRL Processor");
 	ImGui::Spacing();
 
 	static float pid_x_val[3];
-	UI_CTRLVec3TreeNode("PID_X", _PID_X, pid_x_val);
+	UI_Vec3TreeNode("PID X", _PID_X, pid_x_val, enableWriting);
 
 	static float pid_y_val[3];
-	UI_CTRLVec3TreeNode("PID_Y", _PID_Y, pid_y_val);
+	UI_Vec3TreeNode("PID Y", _PID_Y, pid_y_val, enableWriting);
 
 	static float pid_z_val[3];
-	UI_CTRLVec3TreeNode("PID_Z", _PID_Z, pid_z_val);
+	UI_Vec3TreeNode("PID Z", _PID_Z, pid_z_val, enableWriting);
+
+	static float x_mix_val[3];
+	UI_Vec3TreeNode("X channel mix", _X_MIX, x_mix_val, enableWriting);
+
+	static float y_mix_val[3];
+	UI_Vec3TreeNode("Y channel mix", _Y_MIX, y_mix_val, enableWriting);
+
+	static float z_mix_val[3];
+	UI_Vec3TreeNode("Z channel mix", _Z_MIX, z_mix_val, enableWriting);
+
+	static float position_pid[3];
+	UI_Vec3TreeNode("Position PID", _POSITION_PID, position_pid, enableWriting);
+
+	static float waypoint_threshold;
+	UI_ScalarTreeNode("Waypoint Threshold", _WAYPOINT_THRESHOLD, &waypoint_threshold, enableWriting);
+
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Text("NAV Processor");
+	ImGui::Spacing();
+
+	static float kalman_position_uncertainty[3];
+	UI_Vec3TreeNode("Kalman position uncertainty", _KALMAN_POSITION_UNCERTAINTY, kalman_position_uncertainty, enableWriting);
+
+	static float kalman_velocity_uncertainty[3];
+	UI_Vec3TreeNode("Kalman velocity uncertainty", _KALMAN_VELOCITY_UNCERTAINTY, kalman_velocity_uncertainty, enableWriting);
+
+	static float kalman_orientation_uncertainty[3];
+	UI_Vec3TreeNode("Kalman orientation uncertainty", _KALMAN_ORIENTATION_UNCERTAINTY, kalman_orientation_uncertainty, enableWriting);
+
+	static float kalman_orientation_measurement_uncertainty[3];
+	UI_Vec3TreeNode("Kalman orientation measurement uncertainty", _KALMAN_ORIENTATION_MEASUREMENT_UNCERTAINTY, kalman_orientation_measurement_uncertainty, enableWriting);
+
+	static float gnss_horizontal_uncertainty_mul;
+	UI_ScalarTreeNode("GNSS horizontal uncertainty multiplier", _KALMAN_GNSS_HORIZONTAL_UNCERTAINTY_MUL, &gnss_horizontal_uncertainty_mul, enableWriting);
+
+	static float gnss_vertical_uncertainty_mul;
+	UI_ScalarTreeNode("GNSS vertical uncertainty multiplier", _KALMAN_GNSS_VERTICAL_UNCERTAINTY_MUL, &gnss_vertical_uncertainty_mul, enableWriting);
+
+	static float kalman_baro_variance;
+	UI_ScalarTreeNode("Barometer variance", _KALMAN_BARO_VARIANCE, &kalman_baro_variance, enableWriting);
+
+	static float kalman_accel_variance;
+	UI_ScalarTreeNode("Accelerometer variance", _KALMAN_ACCEL_VARIANCE, &kalman_accel_variance, enableWriting);
+
+	static float kalman_angularvelocity_variance;
+	UI_ScalarTreeNode("Angular velocity variance", _KALMAN_ANGULARVELOCITY_VARIANCE, &kalman_angularvelocity_variance, enableWriting);
+
+	static float gnss_zerolat;
+	UI_ScalarTreeNode("GNSS zero latitude", _KALMAN_GNSS_ZEROLAT, &gnss_zerolat, enableWriting, "%.06f");
+
+	static float gnss_zerolong;
+	UI_ScalarTreeNode("GNSS zero longitude", _KALMAN_GNSS_ZEROLONG, &gnss_zerolong, enableWriting, "%.06f");
+
+	static float kalman_run = -1;
+	UI_ScalarTreeNode("Kalman Run", _KALMAN_RUN, &kalman_run, false, "%.0f");
 }
 
 
@@ -955,8 +1044,8 @@ void UI_TableTestInt(const char* text, uint8_t code) {
 }
 
 
-void UI_CTRLVec3TreeNode(const char* text, CTRL_Param parameter, float* value) {
-	char buffer[32];
+void UI_Vec3TreeNode(const char* text, CTRL_Param parameter, float* value, bool enableWrite, const char* format) {
+	char buffer[64];
 	sprintf(buffer, "%s##param", text);
 	if (ImGui::TreeNode(buffer)) {
 		sprintf(buffer, "value##%sparam", text);
@@ -964,6 +1053,46 @@ void UI_CTRLVec3TreeNode(const char* text, CTRL_Param parameter, float* value) {
 		sprintf(buffer, "apply##%sparam", text);
 		if (ImGui::Button(buffer)) {
 			serial.start_vec3setthread(parameter, value);
+		}
+		ImGui::SameLine();
+		sprintf(buffer, "read##%sparam", text);
+		if (ImGui::Button(buffer)) {
+			serial.start_vec3readthread(parameter, value);
+		}
+		if (enableWrite) {
+			ImGui::SameLine();
+			sprintf(buffer, "save##%sparam", text);
+			if (ImGui::Button(buffer)) {
+				serial.start_vec3savethread(parameter);
+			}
+		}
+
+		ImGui::TreePop();
+	}
+}
+
+
+void UI_ScalarTreeNode(const char* text, CTRL_Param parameter, float* value, bool enableWrite, const char* format) {
+	char buffer[64];
+	sprintf(buffer, "%s##param", text);
+	if (ImGui::TreeNode(buffer)) {
+		sprintf(buffer, "value##%sparam", text);
+		ImGui::InputFloat(buffer, value, NULL, NULL, format);
+		sprintf(buffer, "apply##%sparam", text);
+		if (ImGui::Button(buffer)) {
+			serial.start_scalarsetthread(parameter, value);
+		}
+		ImGui::SameLine();
+		sprintf(buffer, "read##%sparam", text);
+		if (ImGui::Button(buffer)) {
+			serial.start_scalarreadthread(parameter, value);
+		}
+		if (enableWrite) {
+			ImGui::SameLine();
+			sprintf(buffer, "save##%sparam", text);
+			if (ImGui::Button(buffer)) {
+				serial.start_scalarsavethread(parameter);
+			}
 		}
 
 		ImGui::TreePop();

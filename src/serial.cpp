@@ -168,6 +168,16 @@ Serial::~Serial() {
 
 
 
+bool Serial::start_sendcommand(uint16_t command) {
+	if (!serialthread_open && port_open) {
+		serialthread = std::thread(&Serial::send_command, this, command);
+
+		return true;
+	}
+
+	return false;
+}
+
 bool Serial::start_pollthread(uint16_t command, uint8_t* read_buffer, uint32_t nr_read, bool continuous) {
 	if (!serialthread_open && port_open) {
 		//this->write_buffer = write_buffer;
@@ -211,6 +221,56 @@ bool Serial::start_eepromreadthread(uint32_t address, uint8_t* writeback) {
 bool Serial::start_vec3setthread(CTRL_Param parameter, float* value) {
 	if (!serialthread_open && port_open) {
 		serialthread = std::thread(&Serial::ctrl_set_vec3, this, parameter, value);
+
+		return true;
+	}
+
+	return false;
+}
+
+bool Serial::start_vec3readthread(CTRL_Param parameter, float* writeback) {
+	if (!serialthread_open && port_open) {
+		serialthread = std::thread(&Serial::ctrl_read_vec3, this, parameter, writeback);
+
+		return true;
+	}
+
+	return false;
+}
+
+bool Serial::start_vec3savethread(CTRL_Param parameter) {
+	if (!serialthread_open && port_open) {
+		serialthread = std::thread(&Serial::ctrl_save_vec3, this, parameter);
+
+		return true;
+	}
+
+	return false;
+}
+
+bool Serial::start_scalarsetthread(CTRL_Param parameter, float* value) {
+	if (!serialthread_open && port_open) {
+		serialthread = std::thread(&Serial::ctrl_set_scalar, this, parameter, value);
+
+		return true;
+	}
+
+	return false;
+}
+
+bool Serial::start_scalarreadthread(CTRL_Param parameter, float* writeback) {
+	if (!serialthread_open && port_open) {
+		serialthread = std::thread(&Serial::ctrl_read_scalar, this, parameter, writeback);
+
+		return true;
+	}
+
+	return false;
+}
+
+bool Serial::start_scalarsavethread(CTRL_Param parameter) {
+	if (!serialthread_open && port_open) {
+		serialthread = std::thread(&Serial::ctrl_save_scalar, this, parameter);
 
 		return true;
 	}
@@ -263,6 +323,18 @@ bool Serial::get_pollDone() {
 //	return pollthread_continuous;
 //}
 
+void Serial::send_command(uint16_t command) {
+	// set serialthread_open flag to true
+	serialthread_open = true;
+
+	timeRequest();
+
+	Transfer_Request request = createTransferRequest(command);
+	write(request.reg, sizeof(request.reg));
+
+	serialthread_done = true;
+	timeReturn();
+}
 
 void Serial::single_poll(uint16_t command, uint8_t* read_buffer, uint32_t nr_read) {
 	// set serialthread_open flag to true
@@ -371,8 +443,8 @@ void Serial::ctrl_set_vec3(CTRL_Param parameter, float* value) {
 	write(request.reg, sizeof(request.reg));
 	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
 	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
-		CTRL_Set_Vec3 set_request;
-		set_request.bit.header = CTRL_SET_VEC3_HEADER;
+		Set_Vec3_Request set_request;
+		set_request.bit.header = SET_VEC3_REQUEST_HEADER;
 		set_request.bit.parameter = (uint16_t) parameter;
 		set_request.bit.data[0] = value[0];
 		set_request.bit.data[1] = value[1];
@@ -380,6 +452,143 @@ void Serial::ctrl_set_vec3(CTRL_Param parameter, float* value) {
 		set_request.bit.crc = crc32(set_request.reg, sizeof(set_request.reg) - 4);
 		write(set_request.reg, sizeof(set_request.reg));
 		//printf("0x%04x\n0x%08x\n0x%08x\n", set_request.bit.header, set_request.bit.crc, crc32(set_request.reg, sizeof(set_request.reg)));
+	}
+	else {
+		std::cout << "Bad response\n";
+	}
+
+	serialthread_done = true;
+	timeReturn();
+}
+
+void Serial::ctrl_read_vec3(CTRL_Param parameter, float* writeback) {
+	// set serialthread_open flag to true
+	serialthread_open = true;
+
+	timeRequest();
+
+	static Transfer_Request request = createTransferRequest(0x0045);
+
+	write(request.reg, sizeof(request.reg));
+	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+		Read_Vec3_Request read_request;
+		read_request.bit.header = READ_VEC3_REQUEST_HEADER;
+		read_request.bit.parameter = (uint16_t)parameter;
+		read_request.bit.crc = crc32(read_request.reg, sizeof(read_request.reg) - 4);
+		write(read_request.reg, sizeof(read_request.reg));
+		
+		Read_Vec3_Response read_packet;
+		read(read_packet.reg, sizeof(read_packet.reg));
+		writeback[0] = read_packet.bit.data[0];
+		writeback[1] = read_packet.bit.data[1];
+		writeback[2] = read_packet.bit.data[2];
+	}
+	else {
+		std::cout << "Bad response\n";
+	}
+
+	serialthread_done = true;
+	timeReturn();
+}
+
+void Serial::ctrl_save_vec3(CTRL_Param parameter) {
+	// set serialthread_open flag to true
+	serialthread_open = true;
+
+	timeRequest();
+
+	static Transfer_Request request = createTransferRequest(0x0046);
+
+	write(request.reg, sizeof(request.reg));
+	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+		Save_Vec3_Request save_request;
+		save_request.bit.header = SAVE_VEC3_REQUEST_HEADER;
+		save_request.bit.parameter = (uint16_t)parameter;
+		save_request.bit.crc = crc32(save_request.reg, sizeof(save_request.reg) - 4);
+		write(save_request.reg, sizeof(save_request.reg));
+	}
+	else {
+		std::cout << "Bad response\n";
+	}
+
+	serialthread_done = true;
+	timeReturn();
+}
+
+void Serial::ctrl_set_scalar(CTRL_Param parameter, float* value) {
+	// set serialthread_open flag to true
+	serialthread_open = true;
+
+	timeRequest();
+
+	static Transfer_Request request = createTransferRequest(0x0047);
+
+	write(request.reg, sizeof(request.reg));
+	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+		Set_Scalar_Request set_request;
+		set_request.bit.header = SET_SCALAR_REQUEST_HEADER;
+		set_request.bit.parameter = (uint16_t)parameter;
+		set_request.bit.data = *value;
+		set_request.bit.crc = crc32(set_request.reg, sizeof(set_request.reg) - 4);
+		write(set_request.reg, sizeof(set_request.reg));
+		//printf("0x%04x\n0x%08x\n0x%08x\n", set_request.bit.header, set_request.bit.crc, crc32(set_request.reg, sizeof(set_request.reg)));
+	}
+	else {
+		std::cout << "Bad response\n";
+	}
+
+	serialthread_done = true;
+	timeReturn();
+}
+
+void Serial::ctrl_read_scalar(CTRL_Param parameter, float* writeback) {
+	// set serialthread_open flag to true
+	serialthread_open = true;
+
+	timeRequest();
+
+	static Transfer_Request request = createTransferRequest(0x0048);
+
+	write(request.reg, sizeof(request.reg));
+	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+		Read_Scalar_Request read_request;
+		read_request.bit.header = READ_SCALAR_REQUEST_HEADER;
+		read_request.bit.parameter = (uint16_t)parameter;
+		read_request.bit.crc = crc32(read_request.reg, sizeof(read_request.reg) - 4);
+		write(read_request.reg, sizeof(read_request.reg));
+
+		Read_Scalar_Response read_packet;
+		read(read_packet.reg, sizeof(read_packet.reg));
+		*writeback = read_packet.bit.data;
+	}
+	else {
+		std::cout << "Bad response\n";
+	}
+
+	serialthread_done = true;
+	timeReturn();
+}
+
+void Serial::ctrl_save_scalar(CTRL_Param parameter) {
+	// set serialthread_open flag to true
+	serialthread_open = true;
+
+	timeRequest();
+
+	static Transfer_Request request = createTransferRequest(0x0049);
+
+	write(request.reg, sizeof(request.reg));
+	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+		Save_Scalar_Request save_request;
+		save_request.bit.header = SAVE_SCALAR_REQUEST_HEADER;
+		save_request.bit.parameter = (uint16_t)parameter;
+		save_request.bit.crc = crc32(save_request.reg, sizeof(save_request.reg) - 4);
+		write(save_request.reg, sizeof(save_request.reg));
 	}
 	else {
 		std::cout << "Bad response\n";

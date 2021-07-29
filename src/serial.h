@@ -13,12 +13,66 @@
 
 
 typedef enum {
+	_CTRL_PARAM_START = 0,
 	_PID_X,
 	_PID_Y,
-	_PID_Z
+	_PID_Z,
+	_X_MIX,
+	_Y_MIX,
+	_Z_MIX,
+	_POSITION_PID,
+	_WAYPOINT_THRESHOLD,
+
+	_CTRL_VOLATILE_PARAM_START = 8192,
+
+	_NAV_PARAM_START = 16384,
+	_KALMAN_POSITION_UNCERTAINTY,
+	_KALMAN_VELOCITY_UNCERTAINTY,
+	_KALMAN_ORIENTATION_UNCERTAINTY,
+	_KALMAN_ORIENTATION_MEASUREMENT_UNCERTAINTY,
+	_KALMAN_GNSS_HORIZONTAL_UNCERTAINTY_MUL,
+	_KALMAN_GNSS_VERTICAL_UNCERTAINTY_MUL,
+	_KALMAN_BARO_VARIANCE,
+	_KALMAN_ACCEL_VARIANCE,
+	_KALMAN_ANGULARVELOCITY_VARIANCE,
+	_KALMAN_GNSS_ZEROLAT,
+	_KALMAN_GNSS_ZEROLONG,
+
+	_NAV_VOLATILE_PARAM_START = 24576,
+	_KALMAN_RUN
 } CTRL_Param;
 
 
+#define NAV_DEVICE_ID 0xd5d5
+#define DEVICE_ID 0xd6d6
+
+
+typedef enum {
+	REQUEST_HEADER_START,
+	TRANSFER_REQUEST_HEADER,
+	EEPROM_READ_REQUEST_HEADER,
+	EEPROM_READ_N_REQUEST_HEADER,
+	EEPROM_WRITE_REQUEST_HEADER,
+	EEPROM_WRITE_N_REQUEST_HEADER,
+	SET_VEC3_REQUEST_HEADER,
+	READ_VEC3_REQUEST_HEADER,
+	SAVE_VEC3_REQUEST_HEADER,
+	SET_SCALAR_REQUEST_HEADER,
+	READ_SCALAR_REQUEST_HEADER,
+	SAVE_SCALAR_REQUEST_HEADER
+} RequestHeader;
+
+typedef enum {
+	NAV_REQUEST_HEADER_START,
+	NAV_SET_VEC3_REQUEST_HEADER,
+	NAV_READ_VEC3_REQUEST_HEADER,
+	NAV_SET_SCALAR_REQUEST_HEADER,
+	NAV_READ_SCALAR_REQUEST_HEADER
+} NAV_RequestHeader;
+
+
+// nav_data_packet
+// packet received from navigation computer
 typedef struct { // aligned is for CRC calculation
 	uint16_t device_id;
 
@@ -87,6 +141,8 @@ typedef union { // union to ease accessing of data
 } NAV_Data_Packet;
 
 
+// nav_selftest_packet
+// packet nagivation computer returns after selftest command
 typedef struct {
 	uint16_t device_id;
 
@@ -106,7 +162,7 @@ typedef union {
 } NAV_Selftest_Packet;
 
 
-#define TRANSFER_REQUEST_HEADER 0x0003
+//#define TRANSFER_REQUEST_HEADER 0x0003
 
 // packet sent by computer to request transfer
 typedef struct {
@@ -138,12 +194,30 @@ typedef struct {
 	uint32_t crc;
 } CTRL_ACK_Packet_Type;
 
-
 typedef union {
 	CTRL_ACK_Packet_Type bit;
 
 	uint8_t reg[sizeof(CTRL_ACK_Packet_Type)];
 } CTRL_ACK_Packet;
+
+
+#define NAV_ACK_OK 0x0000
+#define NAV_ACK_ERROR 0xFFFF
+
+// packet returned to CTRL computer when more data is required to fulfill request
+typedef struct {
+	uint16_t device_id;
+
+	uint16_t status_code;
+
+	uint32_t crc;
+} NAV_ACK_Packet_Type;
+
+typedef union {
+	NAV_ACK_Packet_Type bit;
+
+	uint8_t reg[sizeof(NAV_ACK_Packet_Type)];
+} NAV_ACK_Packet;
 
 
 typedef struct {
@@ -163,7 +237,25 @@ typedef union {
 } CTRL_EEPROM_Read_packet;
 
 
-#define EEPROM_READ_REQUEST_HEADER 0x0001;
+typedef struct {
+	uint16_t device_id;
+
+	uint8_t status;
+	uint8_t nr_bytes;
+	uint8_t data[64];
+
+	uint32_t crc;
+} CTRL_EEPROM_Read_N_Packet_Type;
+
+
+typedef union {
+	CTRL_EEPROM_Read_N_Packet_Type bit;
+
+	uint8_t reg[sizeof(CTRL_EEPROM_Read_N_Packet_Type)];
+} CTRL_EEPROM_Read_N_packet;
+
+
+//#define EEPROM_READ_REQUEST_HEADER 0x0001
 
 typedef struct {
 	uint16_t header;
@@ -181,7 +273,7 @@ typedef union {
 } EEPROM_Read_Request;
 
 
-#define EEPROM_READ_N_REQUEST_HEADER 0x0004
+//#define EEPROM_READ_N_REQUEST_HEADER 0x0004
 
 typedef struct {
 	uint16_t header;
@@ -200,7 +292,7 @@ typedef union {
 } EEPROM_Read_N_Request;
 
 
-#define EEPROM_WRITE_REQUEST_HEADER 0x0002
+//#define EEPROM_WRITE_REQUEST_HEADER 0x0002
 
 typedef struct {
 	uint16_t header;
@@ -219,7 +311,7 @@ typedef union {
 } EEPROM_Write_Request;
 
 
-#define EEPROM_WRITE_N_REQUEST_HEADER 0x0005
+//#define EEPROM_WRITE_N_REQUEST_HEADER 0x0005
 
 typedef struct {
 	uint16_t header;
@@ -239,9 +331,8 @@ typedef union {
 } EEPROM_Write_N_Request;
 
 
-#define CTRL_SET_VEC3_HEADER 0x0006
+//#define SET_VEC3_REQUEST_HEADER 0x0006
 
-//#pragma pack(push, 1)
 typedef struct {
 	uint16_t header;
 
@@ -249,15 +340,121 @@ typedef struct {
 	float data[3];
 
 	uint32_t crc;
-} CTRL_Set_Vec3_Type;
-//#pragma pack(pop)
+} Set_Vec3_Request_Type;
 
 
 typedef union {
-	CTRL_Set_Vec3_Type bit;
+	Set_Vec3_Request_Type bit;
 
-	uint8_t reg[sizeof(CTRL_Set_Vec3_Type)];
-} CTRL_Set_Vec3;
+	uint8_t reg[sizeof(Set_Vec3_Request_Type)];
+} Set_Vec3_Request;
+
+
+typedef struct {
+	uint16_t header;
+
+	uint16_t parameter;
+
+	uint32_t crc;
+} Read_Vec3_Request_Type;
+
+typedef union {
+	Read_Vec3_Request_Type bit;
+
+	uint8_t reg[sizeof(Read_Vec3_Request_Type)];
+} Read_Vec3_Request;
+
+
+typedef struct {
+	uint16_t device_id;
+
+	float data[3];
+
+	uint32_t crc;
+} Read_Vec3_Response_Type;
+
+typedef union {
+	Read_Vec3_Response_Type bit;
+
+	uint8_t reg[sizeof(Read_Vec3_Response_Type)];
+} Read_Vec3_Response;
+
+
+typedef struct {
+	uint16_t header;
+
+	uint16_t parameter;
+
+	uint32_t crc;
+} Save_Vec3_Request_Type;
+
+typedef union {
+	Save_Vec3_Request_Type bit;
+
+	uint8_t reg[sizeof(Save_Vec3_Request_Type)];
+} Save_Vec3_Request;
+
+
+typedef struct {
+	uint16_t header;
+
+	uint16_t parameter; // cast from CTRL_Param
+	float data;
+
+	uint32_t crc;
+} Set_Scalar_Request_Type;
+
+
+typedef union {
+	Set_Scalar_Request_Type bit;
+
+	uint8_t reg[sizeof(Set_Scalar_Request_Type)];
+} Set_Scalar_Request;
+
+
+typedef struct {
+	uint16_t device_id;
+
+	float data;
+
+	uint32_t crc;
+} Read_Scalar_Response_Type;
+
+typedef union {
+	Read_Scalar_Response_Type bit;
+
+	uint8_t reg[sizeof(Read_Scalar_Response_Type)];
+} Read_Scalar_Response;
+
+
+typedef struct {
+	uint16_t header;
+
+	uint16_t parameter;
+
+	uint32_t crc;
+} Read_Scalar_Request_Type;
+
+typedef union {
+	Read_Scalar_Request_Type bit;
+
+	uint8_t reg[sizeof(Read_Scalar_Request_Type)];
+} Read_Scalar_Request;
+
+
+typedef struct {
+	uint16_t header;
+
+	uint16_t parameter;
+
+	uint32_t crc;
+} Save_Scalar_Request_Type;
+
+typedef union {
+	Save_Scalar_Request_Type bit;
+
+	uint8_t reg[sizeof(Save_Scalar_Request_Type)];
+} Save_Scalar_Request;
 
 
 extern NAV_Data_Packet nav_data_packet;
@@ -293,11 +490,17 @@ private:
 	//uint8_t* read_buffer;
 	//uint32_t nr_read;
 	float rate = 10;
+	void send_command(uint16_t command);
 	void single_poll(uint16_t command, uint8_t* read_buffer, uint32_t nr_read);
 	void continuous_poll(uint16_t command, uint8_t* read_buffer, uint32_t nr_read);
 	void eeprom_write_data(uint32_t address, uint8_t data);
 	void eeprom_read_data(uint32_t address, uint8_t* writeback);
 	void ctrl_set_vec3(CTRL_Param parameter, float* value);
+	void ctrl_read_vec3(CTRL_Param parameter, float* writeback);
+	void ctrl_save_vec3(CTRL_Param parameter);
+	void ctrl_set_scalar(CTRL_Param parameter, float* value);
+	void ctrl_read_scalar (CTRL_Param parameter, float* writeback);
+	void ctrl_save_scalar(CTRL_Param parameter);
 
 	Transfer_Request createTransferRequest(uint16_t command);
 
@@ -315,10 +518,16 @@ public:
 	bool write(uint8_t* buffer, uint32_t nr_bytes);
 	void close();
 
+	bool start_sendcommand(uint16_t command);
 	bool start_pollthread(uint16_t command, uint8_t* read_buffer, uint32_t nr_read, bool continuous);
 	bool start_eepromwritethread(uint32_t address, uint8_t data);
 	bool start_eepromreadthread(uint32_t address, uint8_t* writeback);
 	bool start_vec3setthread(CTRL_Param parameter, float* value);
+	bool start_vec3readthread(CTRL_Param parameter, float* writeback);
+	bool start_vec3savethread(CTRL_Param parameter);
+	bool start_scalarsetthread(CTRL_Param parameter, float* value);
+	bool start_scalarreadthread(CTRL_Param parameter, float* writeback);
+	bool start_scalarsavethread(CTRL_Param parameter);
 	void join_pollthread();
 	void join_continuousthread();
 
