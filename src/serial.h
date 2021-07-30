@@ -39,7 +39,7 @@ typedef enum {
 	_KALMAN_GNSS_ZEROLONG,
 
 	_NAV_VOLATILE_PARAM_START = 24576,
-	_KALMAN_RUN
+	//_KALMAN_RUN
 } CTRL_Param;
 
 

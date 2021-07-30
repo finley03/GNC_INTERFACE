@@ -331,6 +331,7 @@ void Serial::send_command(uint16_t command) {
 
 	Transfer_Request request = createTransferRequest(command);
 	write(request.reg, sizeof(request.reg));
+	SDL_Delay(20);
 
 	serialthread_done = true;
 	timeReturn();

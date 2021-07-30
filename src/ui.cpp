@@ -595,6 +595,7 @@ void UI_Commands() {
 	ImGui::Separator();
 	ImGui::Spacing();
 
+	if (ImGui::Button("Reset Guidance")) serial.start_sendcommand(0x0002);
 	if (ImGui::Button("Enable NAV computer polling")) serial.start_sendcommand(0x0000);
 	if (ImGui::Button("Disable NAV computer polling")) serial.start_sendcommand(0x0001);
 	if (ImGui::Button("Reset Processor##control")) serial.start_sendcommand(0x007F);
@@ -607,6 +608,8 @@ void UI_Commands() {
 	if (ImGui::Button("Calibrate magnetometer")) serial.start_sendcommand(0x0082);
 	ImGui::SameLine();
 	ImGui::Text("(Disables NAV computer polling)");
+	if (ImGui::Button("Enable Kalman filter")) serial.start_sendcommand(0x0083);
+	if (ImGui::Button("Disable Kalman filter")) serial.start_sendcommand(0x0084);
 	if (ImGui::Button("Reset Processor##navigation")) serial.start_sendcommand(0x00FF);
 
 	ImGui::Spacing();
@@ -685,9 +688,6 @@ void UI_Parameters() {
 
 	static float gnss_zerolong;
 	UI_ScalarTreeNode("GNSS zero longitude", _KALMAN_GNSS_ZEROLONG, &gnss_zerolong, enableWriting, "%.06f");
-
-	static float kalman_run = -1;
-	UI_ScalarTreeNode("Kalman Run", _KALMAN_RUN, &kalman_run, false, "%.0f");
 }
 
 
