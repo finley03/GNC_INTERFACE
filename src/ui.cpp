@@ -595,6 +595,8 @@ void UI_Commands() {
 	ImGui::Separator();
 	ImGui::Spacing();
 
+	if (ImGui::Button("Start Guidance")) serial.start_sendcommand(0x0003);
+	if (ImGui::Button("Stop Guidance")) serial.start_sendcommand(0x0004);
 	if (ImGui::Button("Reset Guidance")) serial.start_sendcommand(0x0002);
 	if (ImGui::Button("Enable NAV computer polling")) serial.start_sendcommand(0x0000);
 	if (ImGui::Button("Disable NAV computer polling")) serial.start_sendcommand(0x0001);
@@ -656,6 +658,8 @@ void UI_Parameters() {
 	ImGui::Text("NAV Processor");
 	ImGui::Spacing();
 
+	if (ImGui::Button("Save magnetometer calibration")) serial.start_sendcommand(0x0085);
+
 	static float kalman_position_uncertainty[3];
 	UI_Vec3TreeNode("Kalman position uncertainty", _KALMAN_POSITION_UNCERTAINTY, kalman_position_uncertainty, enableWriting);
 
@@ -688,6 +692,20 @@ void UI_Parameters() {
 
 	static float gnss_zerolong;
 	UI_ScalarTreeNode("GNSS zero longitude", _KALMAN_GNSS_ZEROLONG, &gnss_zerolong, enableWriting, "%.06f");
+
+	static float mag_A[9];
+	UI_Vec3TreeNode("Mag Cal A-1", _MAG_A_1, mag_A);
+	UI_Vec3TreeNode("Mag Cal A-2", _MAG_A_2, mag_A + 3);
+	UI_Vec3TreeNode("Mag Cal A-3", _MAG_A_3, mag_A + 6);
+
+	static float mag_b[3];
+	UI_Vec3TreeNode("Mag Cal b", _MAG_B, mag_b);
+
+	static float accel_b[3];
+	UI_Vec3TreeNode("Accel Cal b", _ACCEL_B, accel_b);
+
+	static float gyro_b[3];
+	UI_Vec3TreeNode("Gyro Cal b", _GYRO_B, gyro_b);
 }
 
 
