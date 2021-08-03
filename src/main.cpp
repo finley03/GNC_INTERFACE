@@ -146,7 +146,8 @@ int main(int argc, char* argv[]) {
 
 	// shutdown
 
-	// close polling thread if open
+	// close poll thread
+	serial.join_continuousthread();
 	serial.join_pollthread();
 	// close serial link
 	serial.close();

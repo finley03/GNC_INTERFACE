@@ -1,24 +1,25 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#include <iostream>
-#include <cstdlib>
-#include <cstdint>
-#include <thread>
+//#include <iostream>
+//#include <cstdlib>
+//#include <cstdint>
+//#include <thread>
+//
+//#include <Windows.h>
+//
+//#include <SDL.h>
+//#include <glad/glad.h>
+//
+////#include <imgui.h>
+////#include <imgui_impl_sdl.h>
+////#include <imgui_impl_opengl3.h>
+//
+//#include "imgui.h"
+//#include "imgui_impl_sdl.h"
+//#include "imgui_impl_opengl3.h"
 
-#include <Windows.h>
-
-#include <SDL.h>
-#include <glad/glad.h>
-
-//#include <imgui.h>
-//#include <imgui_impl_sdl.h>
-//#include <imgui_impl_opengl3.h>
-
-#include "imgui.h"
-#include "imgui_impl_sdl.h"
-#include "imgui_impl_opengl3.h"
-
+#include "util.h"
 #include "serial.h"
 #include "screen.h"
 #include "objects.h"

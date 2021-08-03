@@ -27,18 +27,20 @@ void UI_TableTestInt(const char* text, uint8_t code);
 void UI_Vec3TreeNode(const char* text, CTRL_Param parameter, float* value, bool enableWrite = false, const char* format = "%.3f");
 void UI_ScalarTreeNode(const char* text, CTRL_Param parameter, float* value, bool enableWrite = false, const char* format = "%.3f");
 
+bool UI_FSReadDialog(SDL_Window* window, std::string& writeback, bool* p_open, const char* extension = "", bool hideOtherExtensions = false);
+bool UI_FSWriteDialog(SDL_Window* window, std::string& writeback, bool* p_open);
+
+
+uint8_t* route_data = nullptr;
+INT_T route_data_size = 0;
+
 
 void UI_Run(SDL_Window* window, unsigned int& mainObject) {
 	// booleans to track state
 	static bool show_main_menu = false;
 	static bool show_telemetry_readout = false;
 	static bool show_imgui_demo = false;
-
-
-	if (show_main_menu) UI_MainMenu(window, mainObject, &show_main_menu);
-	if (show_telemetry_readout) UI_TelemetryReadout(window, &show_telemetry_readout);
-	if (show_imgui_demo) ImGui::ShowDemoWindow(&show_imgui_demo);
-
+	static bool open_route = false;
 
 	// imgui io handler reference
 	ImGuiIO& io = ImGui::GetIO();
@@ -46,7 +48,6 @@ void UI_Run(SDL_Window* window, unsigned int& mainObject) {
 	// window size information
 	int windowHeight, windowWidth;
 	SDL_GetWindowSize(window, &windowWidth, &windowHeight);
-
 
 	// remove window size constraint
 	/*ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(2, 2));*/
@@ -66,8 +67,6 @@ void UI_Run(SDL_Window* window, unsigned int& mainObject) {
 		ImGuiWindowFlags_MenuBar |
 		ImGuiWindowFlags_NoResize;
 
-	bool randomBool;
-
 	// remove window minimum size
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(0, 0));
 	// begin menu bar
@@ -79,8 +78,7 @@ void UI_Run(SDL_Window* window, unsigned int& mainObject) {
 	if (ImGui::BeginMenuBar()) {
 		ImGui::Text("Autopilot Interface");
 		if (ImGui::BeginMenu("File")) {
-			ImGui::MenuItem("New", NULL, &randomBool);
-			ImGui::MenuItem("Open", NULL, &randomBool);
+			ImGui::MenuItem("Open Route", NULL, &open_route);
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("View")) {
@@ -96,6 +94,20 @@ void UI_Run(SDL_Window* window, unsigned int& mainObject) {
 	}
 	ImGui::End();
 
+	if (show_main_menu) UI_MainMenu(window, mainObject, &show_main_menu);
+	if (show_telemetry_readout) UI_TelemetryReadout(window, &show_telemetry_readout);
+	if (show_imgui_demo) ImGui::ShowDemoWindow(&show_imgui_demo);
+
+	if (open_route) {
+		static std::string filePath;
+		bool fileOpened = UI_FSReadDialog(window, filePath, &open_route, ".bin", true);
+		if (fileOpened) {
+			readFileToByteArray(filePath, route_data, route_data_size);
+			for (INT_T i = 0; i < route_data_size; ++i) {
+				printf("%02X\n", route_data[i]);
+			}
+		}
+	}
 }
 
 
@@ -520,11 +532,6 @@ void UI_DataPolling() {
 			ImGui::SameLine();
 			ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Not Connected to Port");
 		}
-
-		//// close single poll thread
-		//if (serial.get_pollDone()) {
-		//	serial.join_pollthread();
-		//}
 	}
 
 	ImGui::Spacing();
@@ -595,6 +602,8 @@ void UI_Commands() {
 	ImGui::Separator();
 	ImGui::Spacing();
 
+	if (ImGui::Button("Arm Motor")) serial.start_sendcommand(0x0005);
+	if (ImGui::Button("Disarm Motor")) serial.start_sendcommand(0x0006);
 	if (ImGui::Button("Start Guidance")) serial.start_sendcommand(0x0003);
 	if (ImGui::Button("Stop Guidance")) serial.start_sendcommand(0x0004);
 	if (ImGui::Button("Reset Guidance")) serial.start_sendcommand(0x0002);
@@ -638,6 +647,9 @@ void UI_Parameters() {
 	static float pid_z_val[3];
 	UI_Vec3TreeNode("PID Z", _PID_Z, pid_z_val, enableWriting);
 
+	static float thro_config[3];
+	UI_Vec3TreeNode("Thro config ZPR", _THRO_CONFIG, thro_config, enableWriting);
+
 	static float x_mix_val[3];
 	UI_Vec3TreeNode("X channel mix", _X_MIX, x_mix_val, enableWriting);
 
@@ -658,7 +670,9 @@ void UI_Parameters() {
 	ImGui::Text("NAV Processor");
 	ImGui::Spacing();
 
-	if (ImGui::Button("Save magnetometer calibration")) serial.start_sendcommand(0x0085);
+	if (enableWriting) {
+		if (ImGui::Button("Save magnetometer calibration")) serial.start_sendcommand(0x0085);
+	}
 
 	static float kalman_position_uncertainty[3];
 	UI_Vec3TreeNode("Kalman position uncertainty", _KALMAN_POSITION_UNCERTAINTY, kalman_position_uncertainty, enableWriting);
@@ -1115,4 +1129,359 @@ void UI_ScalarTreeNode(const char* text, CTRL_Param parameter, float* value, boo
 
 		ImGui::TreePop();
 	}
+}
+
+
+// procedure creates a file dialog and returns a file path
+bool UI_FSReadDialog(SDL_Window* window, std::string& writeback, bool* p_open, const char* extension, bool hideOtherExtensions) {
+	// get imgui io handler reference (static - only needs to be initialised once)
+	static ImGuiIO& io = ImGui::GetIO();
+	// get window size
+	INT_T windowWidth, windowHeight;
+	SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+	// set constraints on window size and position
+	ImGui::SetNextWindowPos(ImVec2((windowWidth - 500) / 2, (windowHeight - 350) / 2), ImGuiCond_Once);
+	ImGui::SetNextWindowSize(ImVec2(500, 350), ImGuiCond_Once);
+	// flags for window
+	static ImGuiWindowFlags windowflags =
+		ImGuiWindowFlags_NoCollapse;
+
+	// create namespace declaration to reduce code
+	namespace fs = std::filesystem;
+
+	// wether the file has been opened
+	bool fileOpened = false;
+	// boolean that tracks whether opening unselected item has been attempted
+	static bool openAttempt = false;
+	// static bool that tracks wether extension is valid
+	static bool invalidExtension = false;
+
+	ImGui::Begin("Open##fs", p_open, windowflags);
+
+	// get current path
+	static fs::path path = fs::current_path();
+	static std::string pathstr = path.string();
+
+	// index of item selected
+	static INT_T selected = -1;
+
+	// button for moving to parent directory
+	if (ImGui::Button("<##fs", ImVec2(25, 0))) {
+		path = path.parent_path();
+		pathstr = path.string();
+		//std::cout << pathstr << "\n";
+		// reset selected index
+		selected = -1;
+	}
+
+	ImGui::SameLine();
+	// show current directory
+	ImGui::TextColored(ImVec4(0.8f, 0.8f, 1.0f, 1.0f), pathstr.c_str());
+
+	// seperator before directory contents
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Spacing();
+
+	static ImGuiSelectableFlags selectflags =
+		ImGuiSelectableFlags_AllowDoubleClick;
+
+	// list directory contents
+	INT_T index = 0;
+	static fs::path selectedpath;
+	// contain within list box
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
+	if (ImGui::BeginListBox("##directoryfs", ImVec2(-FLT_MIN, ImGui::GetWindowHeight() - 98))) {
+		// iterate through items in directory
+		for (const auto& p : fs::directory_iterator(path)) {
+			// use one color if item is directory
+			if (fs::is_directory(p)) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 1.0f, 1.0f));
+			// if not directory and not selected extension and hideOtherExtensions skip item
+			else if (hideOtherExtensions && strcmp(extension, p.path().extension().string().c_str()) != 0) continue;
+			// if file use different color
+			else ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.9f, 0.9f, 1.0f));
+			// create selectable element for directory element
+			if (ImGui::Selectable(p.path().string().erase(0, pathstr.length()).c_str(), selected == index, selectflags)) {
+				// check if left mouse button clicked twice
+				if (ImGui::IsMouseDoubleClicked(0)) {
+					// check if path is directory
+					if (fs::is_directory(p)) {
+						path = p.path();
+						pathstr = path.string();
+					}
+					else {
+						// if file extension is required and extension does not match
+						if (*extension && strcmp(extension, p.path().extension().string().c_str()) != 0) {
+							invalidExtension = true;
+						}
+						else {
+							invalidExtension = false;
+							writeback = p.path().string();
+							// replace backslashes with forward slashes
+							// it appears std::ifstream doesn't like them
+							std::replace(writeback.begin(), writeback.end(), '\\', '/');
+							// close window
+							*p_open = false;
+							fileOpened = true;
+						}
+
+					}
+					// reset selected
+					selected = -1;
+				}
+				else {
+					// select item
+					selected = index;
+					openAttempt = false;
+					if (!fs::is_directory(p)) {
+						selectedpath = p.path();
+					}
+				}
+			}
+			++index;
+			ImGui::PopStyleColor();
+		}
+		ImGui::EndListBox();
+	}
+	ImGui::PopStyleColor();
+
+	// spacing before final buttons
+	ImGui::Spacing();
+
+	// display warning message to the user if applicable
+	// uses else if to only display one message at a time
+	if (openAttempt) {
+		ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Please select a file");
+		ImGui::SameLine();
+	}
+	else if (invalidExtension) {
+		ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Extension must be %s", extension);
+		ImGui::SameLine();
+	}
+
+	// position cursor to right for buttons
+	ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 140);
+
+	// button to open file
+	if (ImGui::Button("Open##fs", ImVec2(60, 0))) {
+		if (selectedpath.empty()) {
+			openAttempt = true;
+		}
+		else {
+			// if file extension is required
+			if (*extension && strcmp(extension, selectedpath.extension().string().c_str()) != 0) {
+				//if (strcmp(extension, selectedpath.extension().string().c_str()) != 0) {
+				invalidExtension = true;
+			}
+			else {
+				invalidExtension = false;
+				writeback = selectedpath.string();
+				std::replace(writeback.begin(), writeback.end(), '\\', '/');
+				*p_open = false;
+				fileOpened = true;
+			}
+		}
+	}
+
+	// button to cancel opening file
+	ImGui::SameLine();
+	if (ImGui::Button("Cancel##fs", ImVec2(60, 0))) {
+		*p_open = false;
+		openAttempt = false;
+	}
+
+	ImGui::End();
+
+	// if window should close reset some parameters
+	if (!*p_open) {
+		selectedpath.clear();
+		selected = -1;
+	}
+
+	// return true if file found
+	return fileOpened;
+}
+
+// procedure creates a file dialog and returns a file path
+bool UI_FSWriteDialog(SDL_Window* window, std::string& writeback, bool* p_open) {
+	// get imgui io handler reference (static - only needs to be initialised once)
+	static ImGuiIO& io = ImGui::GetIO();
+	// get window size
+	INT_T windowWidth, windowHeight;
+	SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+	// set constraints on window size and position
+	ImGui::SetNextWindowPos(ImVec2((windowWidth - 500) / 2, (windowHeight - 350) / 2), ImGuiCond_Once);
+	ImGui::SetNextWindowSize(ImVec2(500, 350), ImGuiCond_Once);
+	// flags for window
+	static ImGuiWindowFlags windowflags =
+		ImGuiWindowFlags_NoCollapse;
+
+	// create namespace declaration to reduce code
+	namespace fs = std::filesystem;
+
+	// whether the file has been opened
+	bool fileSaved = false;
+	// boolean that tracks whether opening unselected item has been attempted
+	static bool saveAttempt = false;
+
+	ImGui::Begin("Save As##fs", p_open, windowflags);
+
+	// get current path
+	static fs::path path = fs::current_path();
+	static std::string pathstr = path.string();
+
+	// index of item selected
+	static INT_T selected = -1;
+
+	// button for moving to parent directory
+	if (ImGui::Button("<##fs", ImVec2(25, 0))) {
+		path = path.parent_path();
+		pathstr = path.string();
+		//std::cout << pathstr << "\n";
+		// reset selected index
+		selected = -1;
+	}
+
+	ImGui::SameLine();
+	// show current directory
+	ImGui::TextColored(ImVec4(0.8f, 0.8f, 1.0f, 1.0f), pathstr.c_str());
+
+	// seperator before directory contents
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Spacing();
+
+	static ImGuiSelectableFlags selectflags =
+		ImGuiSelectableFlags_AllowDoubleClick;
+
+	// list directory contents
+	INT_T index = 0;
+	//static fs::path selectedpath;
+	// contain within list box
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
+	if (ImGui::BeginListBox("##directoryfs", ImVec2(-FLT_MIN, ImGui::GetWindowHeight() - 98))) {
+		// iterate through items in directory
+		for (const auto& p : fs::directory_iterator(path)) {
+			// use one color if item is directory
+			if (fs::is_directory(p)) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 1.0f, 1.0f));
+			// if file use different color
+			else ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.9f, 0.9f, 1.0f));
+			// create selectable element for directory element
+			if (ImGui::Selectable(p.path().string().erase(0, pathstr.length()).c_str(), selected == index, selectflags)) {
+				// check if left mouse button clicked twice
+				if (ImGui::IsMouseDoubleClicked(0)) {
+					// check if path is directory
+					if (fs::is_directory(p)) {
+						path = p.path();
+						pathstr = path.string();
+					}
+					//else {
+					//	// if file extension is required and extension does not match
+					//	if (*extension && strcmp(extension, p.path().extension().string().c_str()) != 0) {
+					//		invalidExtension = true;
+					//	}
+					//	else {
+					//		invalidExtension = false;
+					//		writeback = p.path().string();
+					//		// replace backslashes with forward slashes
+					//		// it appears std::ifstream doesn't like them
+					//		std::replace(writeback.begin(), writeback.end(), '\\', '/');
+					//		// close window
+					//		*p_open = false;
+					//		fileOpened = true;
+					//	}
+
+					//}
+					// reset selected
+					selected = -1;
+				}
+				else {
+					// select item
+					selected = index;
+					saveAttempt = false;
+					//if (!fs::is_directory(p)) {
+					//	selectedpath = p.path();
+					//}
+				}
+			}
+			++index;
+			ImGui::PopStyleColor();
+		}
+		ImGui::EndListBox();
+	}
+	ImGui::PopStyleColor();
+
+	// spacing before final buttons
+	ImGui::Spacing();
+
+	// display warning message to the user if applicable
+	// uses else if to only display one message at a time
+	if (saveAttempt) {
+		ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Enter File Name");
+		ImGui::SameLine();
+	}
+
+	ImGui::SetNextItemWidth(ImGui::GetWindowWidth() - 145 - ImGui::GetCursorPosX());
+
+	static ImGuiInputTextFlags inputflags =
+		ImGuiInputTextFlags_EnterReturnsTrue;
+
+	static char buffer[260];
+
+	//ImGui::InputTextWithHint("##inputfs", "File Name", buffer);
+
+	if (ImGui::InputTextWithHint("##inputfs", "File Name", buffer, 260, inputflags)) {
+		if (strlen(buffer) != 0) {
+			//selectedpath = path;
+			//selectedpath.replace_filename(buffer);
+			writeback = path.string();
+			writeback.append("/");
+			writeback.append(buffer);
+			std::replace(writeback.begin(), writeback.end(), '\\', '/');
+			fileSaved = true;
+			*p_open = false;
+		}
+		else {
+			saveAttempt = true;
+		}
+	}
+
+	ImGui::SameLine();
+
+	//// position cursor to right for buttons
+	//ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 140);
+
+	// button to save file
+	if (ImGui::Button("Save##fs", ImVec2(60, 0))) {
+		if (strlen(buffer) != 0) {
+			//selectedpath = path;
+			//selectedpath.replace_filename(buffer);
+			writeback = path.string();
+			writeback.append("/");
+			writeback.append(buffer);
+			std::replace(writeback.begin(), writeback.end(), '\\', '/');
+			fileSaved = true;
+			*p_open = false;
+		}
+		else {
+			saveAttempt = true;
+		}
+	}
+
+	// button to cancel saving file
+	ImGui::SameLine();
+	if (ImGui::Button("Cancel##fs", ImVec2(60, 0))) {
+		*p_open = false;
+		saveAttempt = false;
+	}
+
+	ImGui::End();
+
+	// if window should close reset some parameters
+	if (!*p_open) {
+		selected = -1;
+	}
+
+	// return true if file found
+	return fileSaved;
 }

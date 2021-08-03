@@ -1,22 +1,22 @@
 #include "util.h"
 
-
-int readFileToString(const char* filePath, std::string& writeback) {
-	std::ifstream f(filePath);
-	// check if file opened and therefore exists
-	if (!f.is_open()) {
-		std::cout << "Error: could not find file: " << filePath << std::endl;
-		return false;
-	}
-	// create buffer
-	std::stringstream buffer;
-	buffer << f.rdbuf();
-	f.close();
-	// covert to string and send to writeback string
-	writeback = buffer.str();
-	// return success is this point has been reached
-	return true;
-}
+//
+//int readFileToString(const char* filePath, std::string& writeback) {
+//	std::ifstream f(filePath);
+//	// check if file opened and therefore exists
+//	if (!f.is_open()) {
+//		std::cout << "Error: could not find file: " << filePath << std::endl;
+//		return false;
+//	}
+//	// create buffer
+//	std::stringstream buffer;
+//	buffer << f.rdbuf();
+//	f.close();
+//	// covert to string and send to writeback string
+//	writeback = buffer.str();
+//	// return success is this point has been reached
+//	return true;
+//}
 
 
 static uint32_t crc32_table[256];

@@ -22,6 +22,7 @@ typedef enum {
 	_Z_MIX,
 	_POSITION_PID,
 	_WAYPOINT_THRESHOLD,
+	_THRO_CONFIG,
 
 	_CTRL_VOLATILE_PARAM_START = 8192,
 
@@ -500,6 +501,8 @@ private:
 	void continuous_poll(uint16_t command, uint8_t* read_buffer, uint32_t nr_read);
 	void eeprom_write_data(uint32_t address, uint8_t data);
 	void eeprom_read_data(uint32_t address, uint8_t* writeback);
+	void eeprom_write_n_data(uint32_t address, uint8_t* data, uint8_t size); // max 64
+	void eeprom_read_n_data(uint32_t address, uint8_t* writeback, uint8_t size);
 	void ctrl_set_vec3(CTRL_Param parameter, float* value);
 	void ctrl_read_vec3(CTRL_Param parameter, float* writeback);
 	void ctrl_save_vec3(CTRL_Param parameter);
@@ -527,6 +530,8 @@ public:
 	bool start_pollthread(uint16_t command, uint8_t* read_buffer, uint32_t nr_read, bool continuous);
 	bool start_eepromwritethread(uint32_t address, uint8_t data);
 	bool start_eepromreadthread(uint32_t address, uint8_t* writeback);
+	bool start_eepromwritenthread(uint32_t address, uint8_t* data, uint8_t size); // max 64
+	bool start_eepromreadnthread(uint32_t address, uint8_t* writeback, uint8_t size); // max 64
 	bool start_vec3setthread(CTRL_Param parameter, float* value);
 	bool start_vec3readthread(CTRL_Param parameter, float* writeback);
 	bool start_vec3savethread(CTRL_Param parameter);

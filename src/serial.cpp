@@ -218,6 +218,26 @@ bool Serial::start_eepromreadthread(uint32_t address, uint8_t* writeback) {
 	return false;
 }
 
+bool Serial::start_eepromwritenthread(uint32_t address, uint8_t* data, uint8_t size) {
+	if (!serialthread_open && port_open) {
+		serialthread = std::thread(&Serial::eeprom_write_n_data, this, address, data, size);
+
+		return true;
+	}
+
+	return false;
+}
+
+bool Serial::start_eepromreadnthread(uint32_t address, uint8_t* writeback, uint8_t size) {
+	if (!serialthread_open && port_open) {
+		serialthread = std::thread(&Serial::eeprom_read_n_data, this, address, writeback, size);
+
+		return true;
+	}
+
+	return false;
+}
+
 bool Serial::start_vec3setthread(CTRL_Param parameter, float* value) {
 	if (!serialthread_open && port_open) {
 		serialthread = std::thread(&Serial::ctrl_set_vec3, this, parameter, value);
@@ -433,6 +453,67 @@ void Serial::eeprom_read_data(uint32_t address, uint8_t* writeback) {
 	timeReturn();
 }
 
+void Serial::eeprom_write_n_data(uint32_t address, uint8_t* data, uint8_t size) {
+	// set serialthread_open flag to true
+	serialthread_open = true;
+
+	timeRequest();
+
+	static Transfer_Request request = createTransferRequest(0x0043);
+
+	write(request.reg, sizeof(request.reg));
+	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+		EEPROM_Write_N_Request eeprom_write_request;
+		eeprom_write_request.bit.header = EEPROM_WRITE_N_REQUEST_HEADER;
+		for (uint8_t i = 0; i < size; ++i) {
+			eeprom_write_request.bit.data[i] = data[i];
+		}
+		eeprom_write_request.bit.size = size;
+		eeprom_write_request.bit.address = address;
+		eeprom_write_request.bit.crc = crc32(eeprom_write_request.reg, sizeof(eeprom_write_request.reg) - 4);
+		write(eeprom_write_request.reg, sizeof(eeprom_write_request.reg));
+	}
+	else {
+		std::cout << "Bad response\n";
+	}
+
+	serialthread_done = true;
+	timeReturn();
+}
+
+void Serial::eeprom_read_n_data(uint32_t address, uint8_t* writeback, uint8_t size) {
+	// set serialthread_open flag to true
+	serialthread_open = true;
+
+	timeRequest();
+
+	static Transfer_Request request = createTransferRequest(0x0042);
+
+	write(request.reg, sizeof(request.reg));
+	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+		EEPROM_Read_N_Request eeprom_read_request;
+		eeprom_read_request.bit.header = EEPROM_READ_N_REQUEST_HEADER;
+		eeprom_read_request.bit.address = address;
+		eeprom_read_request.bit.size = size;
+		eeprom_read_request.bit.crc = crc32(eeprom_read_request.reg, sizeof(eeprom_read_request.reg) - 4);
+		write(eeprom_read_request.reg, sizeof(eeprom_read_request.reg));
+
+		CTRL_EEPROM_Read_N_packet eeprom_read_packet;
+		read(eeprom_read_packet.reg, sizeof(eeprom_read_packet.reg));
+		for (uint8_t i = 0; i < size; ++i) {
+			writeback[i] = eeprom_read_packet.bit.data[i];
+		}
+	}
+	else {
+		std::cout << "Bad response\n";
+	}
+
+	serialthread_done = true;
+	timeReturn();
+}
+
 void Serial::ctrl_set_vec3(CTRL_Param parameter, float* value) {
 	// set serialthread_open flag to true
 	serialthread_open = true;
@@ -623,4 +704,5 @@ void Serial::timeReturn() {
 	if (continuousthread_open) {
 		timereturned = true;
 	}
+	SDL_Delay(50);
 }
