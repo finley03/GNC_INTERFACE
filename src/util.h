@@ -3,20 +3,38 @@
 #ifndef UTIL_H
 #define UTIL_H
 
+#define AUTOPILOT_INTERFACE
+
 // standard library includes
 
+//#include <iostream>
+//#include <string>
+//#include <vector>
+//#include <fstream>
+//#include <cstdlib>
+//#include <cstdint>
+//#include <cstdio>
+//#include <cstring>
+//#include <cmath>
+//#include <sstream>
+//#include <filesystem>
+//#include <queue>
 #include <iostream>
 #include <string>
 #include <vector>
 #include <fstream>
+#include <sstream>
 #include <cstdlib>
 #include <cstdint>
-#include <cstdio>
 #include <cstring>
+#include <cstdio>
 #include <cmath>
-#include <sstream>
+#include <thread>
+#include <chrono>
+#include <map>
 #include <filesystem>
-#include <queue>
+#include <algorithm>
+#include <iterator>
 
 #include <SDL.h>
 #undef main
@@ -89,6 +107,67 @@ typedef float FLT_T;
 #define UMIN_2(a, b) MIN_2(ABS(a), ABS(b))
 #define UMAX_3(a, b, c) MAX_3(ABS(a), ABS(b), ABS(c))
 #define UMIN_3(a, b, c) MIN_3(ABS(a), ABS(b), ABS(c))
+
+
+#define ARRLEN(a) (sizeof(a)/sizeof(a[0]))
+#define STRLEN(s) (ARRLEN(s)-1)
+
+typedef union {
+	float value;
+
+	uint8_t reg[4];
+} Float_Converter;
+
+
+// Type for color
+typedef struct {
+	float r;
+	float b;
+	float g;
+	float a;
+} Color_Type;
+
+// Type for color union
+typedef union {
+	Color_Type bit;
+
+	float reg[sizeof(Color_Type) / sizeof(float)];
+} Color;
+
+
+struct OBJ_Material {
+	float ambient[3] = { 0.1f, 0.1f, 0.1f };
+	float diffuse[3] = { 1.0f, 0.4f, 0.4f };
+	float specular[3] = { 0.0f, 0.0f, 0.0f };
+	//float emmision[3] = {0.0f, 0.0f, 0.0f};
+	float alpha = 1.0f;
+	float specularExponent = 32.0f;
+	bool textureDiffuse = false;
+	bool textureAmbient = false;
+	bool textureSpecular = false;
+	//std::string ambientTexturePath;
+	//std::string diffuseTexturePath;
+	//std::string specularTexturePath;
+	uint8_t* ambientTexturePointer = nullptr;
+	uint8_t* diffuseTexturePointer = nullptr;
+	uint8_t* specularTexturePointer = nullptr;
+
+	bool customShader = false;
+	std::string vertexShaderPath;
+	std::string fragmentShaderPath;
+};
+
+// structure describing all data about an object
+typedef struct {
+	// data about vertices
+	std::vector<float> mesh;
+	// material data
+	std::vector<OBJ_Material> materials;
+	// array that describes how materials and
+	// vertices are linked
+	// Format: vertexindex, materialindex
+	std::vector<std::pair<UINT_T, UINT_T>> matIndexes;
+} OBJ_Data;
 
 
 // Reads file given in const char* path

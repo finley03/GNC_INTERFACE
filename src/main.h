@@ -43,6 +43,8 @@ SDL_Renderer* renderer;
 SDL_Event event;
 SDL_GLContext gl_context;
 
+Screen* screen;
+
 
 
 

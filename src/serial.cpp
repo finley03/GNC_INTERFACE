@@ -461,6 +461,8 @@ void Serial::eeprom_write_n_data(uint32_t address, uint8_t* data, uint8_t size) 
 
 	static Transfer_Request request = createTransferRequest(0x0043);
 
+	size = MIN_2(size, 64); // max 64 bytes to write
+
 	write(request.reg, sizeof(request.reg));
 	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
 	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {

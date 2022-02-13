@@ -11,7 +11,7 @@ int main(int argc, char* argv[]) {
 	camera.setScreen(width, height);
 	float cameraPosition[] = { 0, 0, 10 };
 	camera.setPosition(cameraPosition);
-	camera.setRange(0.3, 150);
+	camera.setRange(0.05, 1e4);
 	camera.calculateProjectionMatrix();
 	camera.calculateViewMatrix();
 
@@ -35,14 +35,30 @@ int main(int argc, char* argv[]) {
 
 	// initialize screen
 
-	Screen screen(window);
+	//bool status;
+	//Screen screen(window, status);
+	//if (!status) return -1;
 
 
-	int objectStatus;
+	bool objectStatus;
 	Objects lobjects(&camera, objectStatus);
 	if (!objectStatus) return -1;
 	objects = &lobjects;
 
+
+	//// reference grid
+	//Grid localgrid;
+	////grid = Grid();
+	//float position[] = { 0.0f, -0.3f, 0.0f };
+	//localgrid.setPosition(position);
+	//localgrid.setSize(1000);
+	//localgrid.calculateModelMatrix();
+
+	//grid = &localgrid;
+
+	unsigned int gridHandle = objects->newObject("./internal/grid.obj", objectStatus);
+	float gridPosition[3] = { 0.0f, -0.3f, 0.0f };
+	objects->setPosition(gridHandle, gridPosition);
 
 	// create object and set parameters
 
@@ -53,17 +69,6 @@ int main(int argc, char* argv[]) {
 	objects->setOrientation(mainObject, objectOrientation);
 	float objectPosition[] = { 0, 0, 0 };
 	objects->setPosition(mainObject, objectPosition);
-
-
-	// reference grid
-	Grid localgrid;
-	//grid = Grid();
-	float position[] = { 0.0f, -0.3f, 0.0f };
-	localgrid.setPosition(position);
-	localgrid.setSize(1000);
-	localgrid.calculateModelMatrix();
-
-	grid = &localgrid;
 
 
 	//std::cout << sizeof(CTRL_Set_Vec3) << "\n";
@@ -85,7 +90,8 @@ int main(int argc, char* argv[]) {
 			case SDL_WINDOWEVENT:
 				switch (event.window.event) {
 				case SDL_WINDOWEVENT_SIZE_CHANGED:
-					glViewport(0, 0, event.window.data1, event.window.data2);
+					//glViewport(0, 0, event.window.data1, event.window.data2);
+					screen->setViewport(event.window.data1, event.window.data2);
 					camera.setScreen(event.window.data1, event.window.data2);
 					camera.calculateProjectionMatrix();
 					width = event.window.data1;
@@ -121,7 +127,7 @@ int main(int argc, char* argv[]) {
 		ImGui::NewFrame();
 
 
-		screen.clear();
+		screen->clear();
 
 
 
@@ -130,14 +136,17 @@ int main(int argc, char* argv[]) {
 		// render scene
 
 
-		objects->draw(mainObject);
+		objects->renderAll();
 
-		if (grid->show) grid->draw();
+		//objects->render(mainObject);
+
+		//if (grid->show) grid->draw();
+		
 
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-		screen.swap();
+		screen->swap();
 
 		timer.frameDelay();
 
@@ -220,8 +229,19 @@ int init() {
 	}
 
 
-	glViewport(0, 0, WIDTH, HEIGHT); // set opengl viewport size
-	glClearColor(0.06, 0.05, 0.11, 1); // 0 red, 0 green, 0 blue, 1 alpha - 100% opacity
+	bool status;
+	// initialize screen buffers
+	screen = new Screen(window, status);
+	// check successful init
+	if (!status) return false;
+
+
+	screen->setViewport(WIDTH, HEIGHT);
+	screen->setClearColor(0.06f, 0.05f, 0.11f, 1.0f);
+
+
+	//glViewport(0, 0, WIDTH, HEIGHT); // set opengl viewport size
+	//glClearColor(0.06, 0.05, 0.11, 1); // 0 red, 0 green, 0 blue, 1 alpha - 100% opacity
 
 	glEnable(GL_DEPTH_TEST); // some opengl rendering settings
 	glDepthFunc(GL_LEQUAL);

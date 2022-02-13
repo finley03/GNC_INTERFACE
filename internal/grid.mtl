@@ -1,0 +1,8 @@
+# grid mtl file
+
+newmtl grid
+Kd 0.4 0.4 0.4
+shader_V grid.vert
+shader_F grid.frag
+#shader_V ../../autopilotinterface/shaders/grid.vert
+#shader_F ../../autopilotinterface/shaders/grid.frag

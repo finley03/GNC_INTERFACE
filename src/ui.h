@@ -13,6 +13,7 @@
 #include "camera.h"
 #include "time.h"
 #include "grid.h"
+#include "routeasm.h"
 
 #include <SDL.h>
 

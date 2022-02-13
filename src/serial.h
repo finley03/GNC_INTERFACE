@@ -160,6 +160,8 @@ typedef struct {
 	uint32_t crc;
 } NAV_Selftest_Packet_Type;
 
+#define NAV_SELFTEST_PACKET_CRC_OK 0xD2248BF3
+
 
 typedef union {
 	NAV_Selftest_Packet_Type bit;
