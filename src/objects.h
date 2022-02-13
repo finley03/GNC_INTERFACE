@@ -137,6 +137,8 @@ private:
 		// characteristic radius of object
 		float cRadius = 1.0f;
 
+		// true if object has no transparency
+		bool opaque = true;
 		// true if object should be rendered
 		bool visible = true;
 		// false if object is mothballed to be reallocated
@@ -226,6 +228,7 @@ public:
 	void setOrientation(UINT_T objectHandle, float* orientation);
 	void setScale(UINT_T objectHandle, float scale);
 	void setName(UINT_T objectHandle, std::string name);
+	void setOpaque(UINT_T objectHandle, bool opaque);
 	void setVisible(UINT_T objectHandle, bool visible);
 	void setSimulated(UINT_T objectHandle, bool visible);
 	void setInternal(UINT_T objectHandle, bool internal);
@@ -239,6 +242,7 @@ public:
 	float getScale(UINT_T objectHandle);
 	UINT_T getSize(UINT_T objectHandle);
 	std::string getName(UINT_T objectHandle);
+	bool getOpaque(UINT_T objectHandle);
 	bool getVisible(UINT_T objectHandle);
 	bool getSimulated(UINT_T objectHandle);
 	bool getInternal(UINT_T objectHandle);

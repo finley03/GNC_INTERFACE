@@ -537,6 +537,10 @@ void Objects::setName(UINT_T objectHandle, std::string name) {
 	objects[objectHandle].name = name;
 }
 
+void Objects::setOpaque(UINT_T objectHandle, bool opaque) {
+	objects[objectHandle].opaque = opaque;
+}
+
 void Objects::setVisible(UINT_T objectHandle, bool visible) {
 	objects[objectHandle].visible = visible;
 }
@@ -586,6 +590,10 @@ UINT_T Objects::getSize(UINT_T objectHandle) {
 
 std::string Objects::getName(UINT_T objectHandle) {
 	return objects[objectHandle].name;
+}
+
+bool Objects::getOpaque(UINT_T objectHandle) {
+	return objects[objectHandle].opaque;
 }
 
 bool Objects::getVisible(UINT_T objectHandle) {
@@ -772,8 +780,14 @@ void Objects::render(UINT_T objectHandle) {
 }
 
 void Objects::renderAll() {
+	// render opaque object first
 	for (UINT_T i = 0; i < objects.size(); ++i) {
-		if (objects[i].exists && objects[i].visible) {
+		if (objects[i].exists && objects[i].visible && objects[i].opaque) {
+			render(i);
+		}
+	}
+	for (UINT_T i = 0; i < objects.size(); ++i) {
+		if (objects[i].exists && objects[i].visible && !objects[i].opaque) {
 			render(i);
 		}
 	}

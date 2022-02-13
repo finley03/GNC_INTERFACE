@@ -37,7 +37,11 @@ bool UI_FSWriteDialog(SDL_Window* window, std::string& writeback, bool* p_open);
 uint8_t* route_data = nullptr;
 INT_T route_data_size = -1;
 std::string routeFile;
-static std::filesystem::path routeFilePath;
+std::string fileString;
+std::filesystem::path routeFilePath;
+bool binary = false;
+static std::string compileLog;
+bool compiled = false;
 
 
 void UI_Run(SDL_Window* window, unsigned int& mainObject) {
@@ -119,13 +123,22 @@ void UI_Run(SDL_Window* window, unsigned int& mainObject) {
 	if (show_imgui_demo) ImGui::ShowDemoWindow(&show_imgui_demo);
 
 	if (open_route) {
-		bool fileOpened = UI_FSReadDialog(window, routeFile, &open_route, { ".bin" }, true);
+		bool fileOpened = UI_FSReadDialog(window, routeFile, &open_route, { ".bin", ".txt" }, true);
 		if (fileOpened) {
-			readFileToByteArray(routeFile, route_data, route_data_size);
-			routeFilePath = std::filesystem::path(routeFile);
-			for (INT_T i = 0; i < route_data_size; ++i) {
-				printf("%02X\n", route_data[i]);
+			std::string extension = std::filesystem::path(routeFile).extension().string();
+			if (extension == ".bin") {
+				binary = true;
+				compiled = true;
+				readFileToByteArray(routeFile, route_data, route_data_size);
 			}
+			else if (extension == ".txt") {
+				binary = false;
+				compiled = false;
+				readFileToString(routeFile, fileString);
+				route_data_size = -1;
+			}
+			routeFilePath = std::filesystem::path(routeFile);
+			compileLog.clear();
 		}
 	}
 
@@ -662,13 +675,7 @@ void UI_Route(SDL_Window* window) {
 	}
 
 	//static std::filesystem::path routeFilePath;
-	static std::string fileString;
 	//static uint8_t* fileBin = nullptr;
-	static bool binary = false;
-
-	static std::string compileLog;
-
-	static bool compiled = false;
 
 	if (open_route) {
 		bool fileOpened = UI_FSReadDialog(window, routeFile, &open_route, { ".bin", ".txt" }, true);
@@ -700,7 +707,7 @@ void UI_Route(SDL_Window* window) {
 
 			if (ImGui::Button("Compile Route")) {
 				compiled = routeasm(routeFile, fileString, route_data, route_data_size);
-				for (int i = 0; i < route_data_size; ++i) printf("%02X\n", route_data[i]);
+				//for (int i = 0; i < route_data_size; ++i) printf("%02X\n", route_data[i]);
 				routeasm_get_log(compileLog);
 			}
 
@@ -852,6 +859,9 @@ void UI_Parameters() {
 	static float gnss_zerolong;
 	UI_ScalarTreeNode_LoadValue("GNSS zero longitude", _KALMAN_GNSS_ZEROLONG, &gnss_zerolong, enableWriting, &(nav_data_packet.bit.longitude), "Load current latitude", "%.06f");
 
+	static float baro_height_cal;
+	UI_ScalarTreeNode("Barometer height cal", _BARO_HEIGHT_CAL, &baro_height_cal, enableWriting);
+
 	static float mag_A[9];
 	UI_Vec3TreeNode("Mag Cal A-1", _MAG_A_1, mag_A);
 	UI_Vec3TreeNode("Mag Cal A-2", _MAG_A_2, mag_A + 3);
@@ -965,40 +975,40 @@ void UI_EEPROM() {
 				}
 			}
 
-			ImGui::Spacing();
+			//ImGui::Spacing();
 
-			static bool writeRoute = false;
-			if (ImGui::Button("Write Route Data##eeprom")) {
-				if (serial.get_status()) {
-					notConnectedAttempt = false;
-					if (!serial.get_pollState() && !serial.get_pollDone()) {
-						writeRoute = true;
-					}
-					else {
-						warnOtherPollEvents = true;
-					}
-				}
-				else {
-					notConnectedAttempt = true;
-				}
-			}
+			//static bool writeRoute = false;
+			//if (ImGui::Button("Write Route Data##eeprom")) {
+			//	if (serial.get_status()) {
+			//		notConnectedAttempt = false;
+			//		if (!serial.get_pollState() && !serial.get_pollDone()) {
+			//			writeRoute = true;
+			//		}
+			//		else {
+			//			warnOtherPollEvents = true;
+			//		}
+			//	}
+			//	else {
+			//		notConnectedAttempt = true;
+			//	}
+			//}
 
-			if (writeRoute) {
-				//for (INT_T i = 0; i <= route_data_size / 64; ++i) {
-				if (!serial.get_pollState()) {
-					static INT_T i = 0;
-					if (i <= route_data_size / 64) {
-						printf("writing %d bytes at address %04X\n", (i == route_data_size / 64) ? route_data_size % 64 : 64, i * 64);
-						serial.start_eepromwritenthread(i * 64, route_data + (i * 64), (i == route_data_size / 64) ? route_data_size % 64 : 64);
-						++i;
-					}
-					else {
-						i = 0;
-						writeRoute = false;
-					}
-				}
-				//}
-			}
+			//if (writeRoute) {
+			//	//for (INT_T i = 0; i <= route_data_size / 64; ++i) {
+			//	if (!serial.get_pollState()) {
+			//		static INT_T i = 0;
+			//		if (i <= route_data_size / 64) {
+			//			printf("writing %d bytes at address %04X\n", (i == route_data_size / 64) ? route_data_size % 64 : 64, i * 64);
+			//			serial.start_eepromwritenthread(i * 64, route_data + (i * 64), (i == route_data_size / 64) ? route_data_size % 64 : 64);
+			//			++i;
+			//		}
+			//		else {
+			//			i = 0;
+			//			writeRoute = false;
+			//		}
+			//	}
+			//	//}
+			//}
 		}
 
 		// turn of notConnectAttempt if connection reestablished

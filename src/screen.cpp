@@ -131,7 +131,7 @@ Screen::Screen(SDL_Window* window, bool& success) : screenShader(vertexFilePath,
     // create multisample framebuffer
     glGenTextures(1, &MSAABUFFER);
     glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, MSAABUFFER);
-    glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, ANTIALIASING_SAMPLES, GL_RGB, width, height, GL_TRUE);
+    glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, ANTIALIASING_SAMPLES, GL_RGBA, width, height, GL_TRUE);
     glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, 0);
 
     // assign texture as framebuffer
@@ -167,7 +167,7 @@ Screen::Screen(SDL_Window* window, bool& success) : screenShader(vertexFilePath,
     // create screen texture for rendering
     glGenTextures(1, &SCREENTEX);
     glBindTexture(GL_TEXTURE_2D, SCREENTEX);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
@@ -214,7 +214,7 @@ Screen::Screen(INT_T width, INT_T height, bool& success) : screenShader(vertexFi
     // create multisample framebuffer
     glGenTextures(1, &MSAABUFFER);
     glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, MSAABUFFER);
-    glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, ANTIALIASING_SAMPLES, GL_RGB, width, height, GL_TRUE);
+    glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, ANTIALIASING_SAMPLES, GL_RGBA, width, height, GL_TRUE);
     glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, 0);
 
     // assign texture as framebuffer
@@ -250,7 +250,7 @@ Screen::Screen(INT_T width, INT_T height, bool& success) : screenShader(vertexFi
     // create screen texture for rendering
     glGenTextures(1, &SCREENTEX);
     glBindTexture(GL_TEXTURE_2D, SCREENTEX);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
@@ -408,11 +408,11 @@ void Screen::setViewport(int32_t width, int32_t height) {
 
     // reallocate memory for different buffers
     glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, MSAABUFFER);
-    glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, ANTIALIASING_SAMPLES, GL_RGB, width, height, GL_TRUE);
+    glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, ANTIALIASING_SAMPLES, GL_RGBA, width, height, GL_TRUE);
 
     glBindRenderbuffer(GL_RENDERBUFFER, RBO);
     glRenderbufferStorageMultisample(GL_RENDERBUFFER, ANTIALIASING_SAMPLES, GL_DEPTH_COMPONENT24, width, height);
 
     glBindTexture(GL_TEXTURE_2D, SCREENTEX);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 }

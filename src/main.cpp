@@ -59,6 +59,7 @@ int main(int argc, char* argv[]) {
 	unsigned int gridHandle = objects->newObject("./internal/grid.obj", objectStatus);
 	float gridPosition[3] = { 0.0f, -0.3f, 0.0f };
 	objects->setPosition(gridHandle, gridPosition);
+	objects->setOpaque(gridHandle, false);
 
 	// create object and set parameters
 
