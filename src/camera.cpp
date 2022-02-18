@@ -1,76 +1,47 @@
+// source file for camera class
+
 #include "camera.h"
 
-
-Camera camera;
-
-
-void Camera::translate(float* delta) {
-	//position.x += delta[0];
-	//position.y += delta[1];
-	//position.z += delta[2];
-	//target.x += delta[0];
-	//target.y += delta[1];
-	//target.z += delta[2];
-	glm::vec3 deltavec = glm::make_vec3(delta);
-	position += deltavec;
-	target += deltavec;
+void Camera::setPosition(float* position) {
+	// passed parameters take precedence over class attributes
+	// therefore this is used to access class attributes
+	this->position = glm::make_vec3(position);
 }
 
-void Camera::translateTarget(float* delta) {
-	//target.x += delta[0];
-	//target.y += delta[1];
-	//target.z += delta[2];
-	target += glm::make_vec3(delta);
+void Camera::setTarget(float* target) {
+	this->target = glm::make_vec3(target);
 }
 
-void Camera::translatePosition(float* delta) {
-	//position.x += delta[0];
-	//position.y += delta[1];
-	//position.z += delta[2];
-	position += glm::make_vec3(delta);
+void Camera::setUp(float* up) {
+	this->up = glm::make_vec2(up);
 }
 
-void Camera::setPosition(float* newPosition) {
-	//position.x = newPosition[0];
-	//position.y = newPosition[1];
-	//position.z = newPosition[2];
-	position = glm::make_vec3(newPosition);
+void Camera::setRotation(float rotation) {
+	// use trigonmetric functions to find up direction
+	up = glm::vec2(-sin(glm::radians(rotation)), cos(glm::radians(rotation)));
+	this->rotation = rotation;
 }
 
-void Camera::setTarget(float* newTarget) {
-	//target.x = newTarget[0];
-	//target.y = newTarget[1];
-	//target.z = newTarget[2];
-	target = glm::make_vec3(newTarget);
+void Camera::setFov(float fov) {
+	this->fov = fov;
 }
 
-void Camera::setTargetTrack(float* newTarget) {
-	glm::vec3 delta = glm::make_vec3(newTarget) - target;
-	target += delta;
-	position += delta;
+void Camera::setScreen(UINT_T width, UINT_T height) {
+	this->width = width;
+	this->height = height;
 }
 
-void Camera::setProjection(float newFov, int newWidth, int newHeight, float newNear, float newFar) {
-	fov = newFov;
-	width = newWidth;
-	height = newHeight;
-	nearDistance = newNear;
-	farDistance = newFar;
+void Camera::setRange(float near, float far) {
+	nearDistance = near;
+	farDistance = far;
 }
 
-void Camera::setFov(float newFov) {
-	fov = newFov;
+void Camera::setTargetTrack(float* target) {
+	glm::vec3 delta = glm::make_vec3(target) - this->target;
+	this->target += delta;
+	this->position += delta;
 }
 
-void Camera::setScreen(int newWidth, int newHeight) {
-	height = newHeight;
-	width = newWidth;
-}
-
-void Camera::setRange(float newNear, float newFar) {
-	nearDistance = newNear;
-	farDistance = newFar;
-}
 
 void Camera::getPosition(float* writeback) {
 	writeback[0] = position.x;
@@ -84,16 +55,17 @@ void Camera::getTarget(float* writeback) {
 	writeback[2] = target.z;
 }
 
+void Camera::getUp(float* writeback) {
+	writeback[0] = up.x;
+	writeback[1] = up.y;
+}
+
+float Camera::getRotation() {
+	return rotation;
+}
+
 float Camera::getFov() {
 	return fov;
-}
-
-void Camera::calculateViewMatrix() {
-	view = glm::lookAt(position, target, glm::vec3(0.0f, 1.0f, 0.0f));
-}
-
-void Camera::calculateProjectionMatrix() {
-	projection = glm::perspective(glm::radians(fov), (float) width / height, nearDistance, farDistance);
 }
 
 glm::mat4 Camera::getViewMatrix() {
@@ -104,25 +76,49 @@ glm::mat4 Camera::getProjectionMatrix() {
 	return projection;
 }
 
-void Camera::mouseRevolve(float mouseX, float mouseY) {
-	// vector from target to camera:
-	glm::vec3 cameraTargetVector = target - position;
 
+void Camera::translate(float* delta) {
+	glm::vec3 deltavec = glm::make_vec3(delta);
+	position += deltavec;
+	target += deltavec;
+}
+
+void Camera::translateTarget(float* delta) {
+	target += glm::make_vec3(delta);
+}
+
+void Camera::translatePosition(float* delta) {
+	position += glm::make_vec3(delta);
+}
+
+
+void Camera::mouseRevolve(float mouseX, float mouseY) {
+	// vector from target to camera
+	glm::vec3 cameraTargetVector = target - position;
+	// create identity rotation matrix
 	glm::mat4 rotateMatrix = glm::mat4(1.0f);
-	rotateMatrix = glm::rotate(rotateMatrix, (mouseY / height) * 2.0f, glm::normalize(glm::cross(cameraTargetVector, glm::vec3(0.0f, -1.0f, 0.0f))));
-	rotateMatrix = glm::rotate(rotateMatrix, (mouseX / height) * 2.0f, glm::vec3(0.0f, -1.0f, 0.0f));
+	// down direction in XYZ coordinates
+	glm::vec3 down = glm::vec3(0.0f, -1.0f, 0.0f);
+	// rotate camera in Y direction
+	// rotates by calculated value anticlockwise
+	// around vector calculated as the cross product between
+	// the cameraTargetVector and down
+	glm::vec3 Yaxis = glm::normalize(glm::cross(cameraTargetVector, down));
+	rotateMatrix = glm::rotate(rotateMatrix, (mouseY / height) * 2.0f, Yaxis);
+	// rotate camera in X direction around down axis
+	rotateMatrix = glm::rotate(rotateMatrix, (mouseX / height) * 2.0f, down);
 
 	// translate position to target
-	position = position + cameraTargetVector;
-	// translate positon to new position;
-	position = position - glm::vec3(rotateMatrix * glm::vec4(cameraTargetVector, 1.0f));
+	position += cameraTargetVector;
+	// translate position to new position
+	position -= glm::vec3(rotateMatrix * glm::vec4(cameraTargetVector, 1.0f));
 }
 
 void Camera::mouseZoom(float mouseZoom) {
 	glm::vec3 cameraTargetVector = target - position;
-
+	// get scale factor of zoom
 	float scale = pow(1.25, -mouseZoom);
-
+	// adjust position
 	position += cameraTargetVector * (1 - scale);
 }
 
@@ -130,20 +126,32 @@ void Camera::mouseTranslate(float mouseX, float mouseY) {
 	mouseX = -mouseX * 2 / height;
 	mouseY = mouseY * 2 / height;
 
-	// vector from target to camera:
+	// vector from target to camera
 	glm::vec3 cameraTargetVector = target - position;
+	// calculate length of cameratargetvector
 	float cameraTargetLength = glm::length(cameraTargetVector);
 
-	glm::vec3 directionY, directionX;
+	glm::vec3 directionX, directionY;
 
+	// set plane direction vectors
 	directionX = glm::normalize(glm::cross(cameraTargetVector, glm::vec3(0.0f, 1.0f, 0.0f)));
 	directionY = glm::normalize(glm::cross(directionX, cameraTargetVector));
 
-	glm::vec3 deltaY = glm::vec3(0.0f), deltaX = glm::vec3(0.0f);
+	// initialize position deltas
+	glm::vec3 deltaY, deltaX;
 
+	// set position deltas
 	deltaX = directionX * mouseX * cameraTargetLength * sin(glm::radians(fov / 2));
 	deltaY = directionY * mouseY * cameraTargetLength * sin(glm::radians(fov / 2));
 
 	position = position + deltaX + deltaY;
 	target = target + deltaX + deltaY;
+}
+
+void Camera::calculateViewMatrix() {
+	view = glm::lookAt(position, target, glm::vec3(up, 0.0f));
+}
+
+void Camera::calculateProjectionMatrix() {
+	projection = glm::perspective(glm::radians(fov), (float)width / height, nearDistance, farDistance);
 }

@@ -1,47 +1,60 @@
+// source file for time class
+
 #include "time.h"
 
-
-Timer timer;
-
-
 void Timer::start() {
-	StartTime = clock::now();
+	if (paused) resume();
+	else startTime = clock::now();
 }
-
 
 void Timer::reset() {
-	StartTime = {};
-	EnlapsedTime = {};
+	startTime = {};
+	paused = false;
 }
 
-
-Timer::clock::duration Timer::getEnlapsed() {
-	EnlapsedTime = clock::now() - StartTime;
-	return EnlapsedTime;
+void Timer::pause() {
+	pauseTime = clock::now();
+	paused = true;
 }
 
-float Timer::getEnlapsedFloat() {
-	return std::chrono::duration<float>(getEnlapsed()).count();
+void Timer::resume() {
+	startTime += clock::now() - pauseTime;
+	paused = false;
 }
 
-float Timer::getEnlapsedFloatMS() {
-	return std::chrono::duration<float>(getEnlapsed()).count() * 1000;
+void Timer::setRateCap(float cap) {
+	rateCap = cap;
 }
 
-
-void Timer::setFrameCap(float cap) {
-	frameRateCap = cap;
+float Timer::getRateCap() {
+	return rateCap;
 }
 
-float Timer::getFrameCap() {
-	return frameRateCap;
+Timer::clock::duration Timer::getEnlapsedDuration() {
+	// calculates difference between current time and previous recorded time
+	clock::duration enlapsedTime = clock::now() - startTime;
+	return enlapsedTime;
 }
 
-void Timer::frameDelay() {
-	float renderTime = getEnlapsedFloatMS();
-	if (renderTime < 1000.0f / frameRateCap) {
-		SDL_Delay((uint32_t)((1000.0f / frameRateCap) - renderTime));
+float Timer::getEnlapsed() {
+	// basically just a fancy cast
+	return std::chrono::duration<float>(getEnlapsedDuration()).count();
+}
+
+float Timer::getEnlapsedMS() {
+	return std::chrono::duration<float>(getEnlapsedDuration()).count() * 1000;
+}
+
+void Timer::delay() {
+	// get current enlapsed time
+	// delay function works in ms, therefore
+	// I will work in ms
+	float enlapsedTime = getEnlapsedMS();
+	// if enlapsed time is less than target time
+	// call delay function
+	if (enlapsedTime + 1 < 1000.0f / rateCap) {
+		//SDL_Delay(static_cast<uint32_t>((1000.0f / rateCap) - enlapsedTime));
+		std::this_thread::sleep_for(std::chrono::microseconds(static_cast<uint32_t>((1.0E6f / rateCap) - enlapsedTime * 1000 - 1000)));
 	}
-	reset();
 	start();
 }

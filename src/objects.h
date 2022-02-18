@@ -292,6 +292,4 @@ public:
 	//size_t externalSize();
 };
 
-extern Objects* objects;
-
 #endif

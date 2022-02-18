@@ -392,9 +392,9 @@ void Serial::continuous_poll(uint16_t command, uint8_t* read_buffer, uint32_t nr
 		if (!write(request.reg, sizeof(request.reg))) close();
 		if (!read(read_buffer, nr_read)) close();
 
-		threadTimer.setFrameCap(rate);
+		threadTimer.setRateCap(rate);
 
-		threadTimer.frameDelay();
+		threadTimer.delay();
 	}
 }
 

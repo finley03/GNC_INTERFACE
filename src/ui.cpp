@@ -1,7 +1,17 @@
 #include "ui.h"
+#include "screen.h"
+#include "camera.h"
+#include "objects.h"
+#include "time.h"
+#include "csys.h"
+#include "api.h"
+#include "serial.h"
+#include "routeasm.h"
 
+void UI_ConfigureStyle();
 
 // forward function definitions for main menu
+void UI_MenuBar(SDL_Window* window);
 void UI_MainMenu(SDL_Window* window, unsigned int& mainObject, bool* p_open);
 void UI_Rendering(unsigned int& mainObject);
 void UI_Model(unsigned int& mainObject);
@@ -33,6 +43,11 @@ void UI_ScalarTreeNode_LoadValue(const char* text, CTRL_Param parameter, float* 
 bool UI_FSReadDialog(SDL_Window* window, std::string& writeback, bool* p_open, std::vector<const char*> extensions = { "" }, bool hideOtherExtensions = false);
 bool UI_FSWriteDialog(SDL_Window* window, std::string& writeback, bool* p_open);
 
+extern Csys* csys;
+extern Screen* screen;
+extern Timer* frameTimer;
+extern API* api;
+
 
 uint8_t* route_data = nullptr;
 INT_T route_data_size = -1;
@@ -44,12 +59,139 @@ static std::string compileLog;
 bool compiled = false;
 
 
-void UI_Run(SDL_Window* window, unsigned int& mainObject) {
+void UI(SDL_Window* window) {
+	// set up new frame
+	ImGui_ImplOpenGL3_NewFrame();
+	ImGui_ImplSDL2_NewFrame(window);
+	ImGui::NewFrame();
+
+	UI_MenuBar(window);
+
+	api->objects.renderAll();
+
+	// render user interface
+	ImGui::Render();
+	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+
+	//// booleans to track state
+	//static bool show_main_menu = false;
+	//static bool show_telemetry_readout = false;
+	//static bool show_imgui_demo = false;
+	//static bool open_route = false;
+	//static bool show_csys_display = false;
+
+	//// imgui io handler reference
+	//ImGuiIO& io = ImGui::GetIO();
+
+	//// window size information
+	//int windowHeight, windowWidth;
+	//SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+
+	//// remove window size constraint
+	///*ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(2, 2));*/
+
+	//// set constraints on window position and size
+	//ImGui::SetNextWindowPos(ImVec2(0, 0));
+	//// minimum window height is smaller then height of menu therefore minimum menu height applies
+	//ImGui::SetNextWindowSize(ImVec2(windowWidth, 10));
+
+	//bool p_open;
+
+	//// flags for window creation
+	//ImGuiWindowFlags windowflags =
+	//	ImGuiWindowFlags_NoTitleBar |
+	//	ImGuiWindowFlags_NoCollapse |
+	//	ImGuiWindowFlags_NoMove |
+	//	ImGuiWindowFlags_MenuBar |
+	//	ImGuiWindowFlags_NoResize;
+
+	//// remove window minimum size
+	//ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(0, 0));
+	//// begin menu bar
+	//ImGui::Begin("Menu Bar", &p_open, windowflags);
+
+	//ImGui::PopStyleVar();
+
+	////static std::string routeFile;
+	////static std::filesystem::path routeFilePath;
+
+	//if (ImGui::BeginMenuBar()) {
+	//	ImGui::TextUnformatted("Autopilot Interface");
+	//	if (ImGui::BeginMenu("File##menubar")) {
+	//		ImGui::MenuItem("Open Route##menubar", NULL, &open_route);
+	//		ImGui::EndMenu();
+	//	}
+	//	if (ImGui::BeginMenu("View##menubar")) {
+	//		ImGui::MenuItem("Main Menu##menubar", NULL, &show_main_menu);
+	//		ImGui::MenuItem("Telemetry Readout##menubar", NULL, &show_telemetry_readout);
+	//		ImGui::MenuItem("CSYS Display##menubar", NULL, &show_csys_display);
+	//		ImGui::EndMenu();
+	//	}
+	//	if (ImGui::BeginMenu("Debug##menubar")) {
+	//		ImGui::MenuItem("ImGui Demo Window##menubar", NULL, &show_imgui_demo);
+	//		ImGui::EndMenu();
+	//	}
+
+	//	char routeBuffer[64];
+	//	if (routeFile.empty()) {
+	//		sprintf(routeBuffer, "No route open");
+	//	}
+	//	else if (route_data_size >= 0) {
+	//		sprintf(routeBuffer, "Loaded route: %s (%d bytes)", routeFilePath.filename().string().c_str(), route_data_size);
+	//	}
+	//	else {
+	//		sprintf(routeBuffer, "Loaded route: %s", routeFilePath.filename().string().c_str());
+	//	}
+	//	ImGui::SetCursorPosX(ImGui::GetWindowWidth() - ImGui::CalcTextSize(routeBuffer).x - 10);
+	//	ImGui::TextUnformatted(routeBuffer);
+
+	//	ImGui::EndMenuBar();
+	//}
+
+	//if (show_main_menu) UI_MainMenu(window, mainObject, &show_main_menu);
+	//if (show_telemetry_readout) UI_TelemetryReadout(window, &show_telemetry_readout);
+	//if (show_imgui_demo) ImGui::ShowDemoWindow(&show_imgui_demo);
+	//if (show_csys_display) csys->showWindow();
+
+	//if (open_route) {
+	//	bool fileOpened = UI_FSReadDialog(window, routeFile, &open_route, { ".bin", ".txt" }, true);
+	//	if (fileOpened) {
+	//		std::string extension = std::filesystem::path(routeFile).extension().string();
+	//		if (extension == ".bin") {
+	//			binary = true;
+	//			compiled = true;
+	//			readFileToByteArray(routeFile, route_data, route_data_size);
+	//		}
+	//		else if (extension == ".txt") {
+	//			binary = false;
+	//			compiled = false;
+	//			readFileToString(routeFile, fileString);
+	//			route_data_size = -1;
+	//		}
+	//		routeFilePath = std::filesystem::path(routeFile);
+	//		compileLog.clear();
+	//	}
+	//}
+
+	//ImGui::End();
+}
+
+
+void UI_ConfigureStyle() {
+	ImGuiStyle& style = ImGui::GetStyle();
+
+	style.Colors[ImGuiCol_WindowBg] = ImVec4(15.0f / 0xff, 15.0f / 0xff, 15.0f / 0xff, 200.0f / 0xff);
+}
+
+
+void UI_MenuBar(SDL_Window* window) {
 	// booleans to track state
 	static bool show_main_menu = false;
 	static bool show_telemetry_readout = false;
 	static bool show_imgui_demo = false;
 	static bool open_route = false;
+	static bool show_csys_display = false;
 
 	// imgui io handler reference
 	ImGuiIO& io = ImGui::GetIO();
@@ -88,17 +230,18 @@ void UI_Run(SDL_Window* window, unsigned int& mainObject) {
 
 	if (ImGui::BeginMenuBar()) {
 		ImGui::TextUnformatted("Autopilot Interface");
-		if (ImGui::BeginMenu("File")) {
-			ImGui::MenuItem("Open Route", NULL, &open_route);
+		if (ImGui::BeginMenu("File##menubar")) {
+			ImGui::MenuItem("Open Route##menubar", NULL, &open_route);
 			ImGui::EndMenu();
 		}
-		if (ImGui::BeginMenu("View")) {
-			ImGui::MenuItem("Main Menu", NULL, &show_main_menu);
-			ImGui::MenuItem("Telemetry Readout", NULL, &show_telemetry_readout);
+		if (ImGui::BeginMenu("View##menubar")) {
+			ImGui::MenuItem("Main Menu##menubar", NULL, &show_main_menu);
+			ImGui::MenuItem("Telemetry Readout##menubar", NULL, &show_telemetry_readout);
+			ImGui::MenuItem("CSYS Display##menubar", NULL, &show_csys_display);
 			ImGui::EndMenu();
 		}
-		if (ImGui::BeginMenu("Debug")) {
-			ImGui::MenuItem("ImGui Demo Window", NULL, &show_imgui_demo);
+		if (ImGui::BeginMenu("Debug##menubar")) {
+			ImGui::MenuItem("ImGui Demo Window##menubar", NULL, &show_imgui_demo);
 			ImGui::EndMenu();
 		}
 
@@ -118,9 +261,10 @@ void UI_Run(SDL_Window* window, unsigned int& mainObject) {
 		ImGui::EndMenuBar();
 	}
 
-	if (show_main_menu) UI_MainMenu(window, mainObject, &show_main_menu);
+	/*if (show_main_menu) UI_MainMenu(window, mainObject, &show_main_menu);
 	if (show_telemetry_readout) UI_TelemetryReadout(window, &show_telemetry_readout);
 	if (show_imgui_demo) ImGui::ShowDemoWindow(&show_imgui_demo);
+	if (show_csys_display) csys->showWindow();*/
 
 	if (open_route) {
 		bool fileOpened = UI_FSReadDialog(window, routeFile, &open_route, { ".bin", ".txt" }, true);
@@ -143,6 +287,11 @@ void UI_Run(SDL_Window* window, unsigned int& mainObject) {
 	}
 
 	ImGui::End();
+
+	if (show_main_menu) UI_MainMenu(window, api->mainObject, &show_main_menu);
+	if (show_telemetry_readout) UI_TelemetryReadout(window, &show_telemetry_readout);
+	if (show_imgui_demo) ImGui::ShowDemoWindow(&show_imgui_demo);
+	if (show_csys_display) csys->showWindow();
 }
 
 
@@ -225,7 +374,7 @@ void UI_Rendering(unsigned int& mainObject) {
 	bool apply = false;
 
 	// default frame cap
-	static float frameCap = timer.getFrameCap();
+	static float frameCap = frameTimer->getRateCap();
 	//if (ImGui::InputScalar("Frame Cap##rendering", ImGuiDataType_Float, &frameCap, NULL, NULL, "%.1f", inputflags)) {
 	//	apply = true;
 	//}
@@ -243,7 +392,7 @@ void UI_Rendering(unsigned int& mainObject) {
 
 	// apply inputs if enter key is pressed and input is valid
 	if (apply && validInputs) {
-		timer.setFrameCap(frameCap);
+		frameTimer->setRateCap(frameCap);
 	}
 
 	ImGui::Spacing();
@@ -251,18 +400,22 @@ void UI_Rendering(unsigned int& mainObject) {
 	ImGui::Spacing();
 
 	static bool showGrid = true;
-	ImGui::Checkbox("Show Grid##rendering", &showGrid);
+	if (ImGui::Checkbox("Show Grid##rendering", &showGrid)) {
+		// handle of grid (should) be 0
+		api->objects.setVisible(api->getGridHandle(), showGrid);
+	}
 
-	// handle of grid (should) be 0
-	objects->setVisible(0, showGrid);
 	//grid->show = showGrid;
-	static float gridHeight = 0;
+	static float gridPosition[3];
+	static bool once = true;
+	if (once) api->objects.getPosition(api->getGridHandle(), gridPosition), once = false;
+	static float gridHeight = gridPosition[1];
 	if (showGrid) {
 		if (ImGui::InputFloat("Grid Height##rendering", &gridHeight, NULL, NULL, "%.1f", inputflags)) {
-			float gridPosition[3] = { 0, gridHeight, 0 };
+			gridPosition[1] = gridHeight;
 			//grid->setPosition(gridPosition);
 			//grid->calculateModelMatrix();
-			objects->setPosition(0, gridPosition);
+			api->objects.setPosition(api->getGridHandle(), gridPosition);
 		}
 	}
 
@@ -279,33 +432,33 @@ void UI_Rendering(unsigned int& mainObject) {
 	ImGui::Combo("Tracking##rendering", &trackItem, trackItems, IM_ARRAYSIZE(trackItems));
 
 	float cameraPosition[3], cameraTarget[3], cameraFOV;
-	camera.getPosition(cameraPosition);
-	camera.getTarget(cameraTarget);
-	cameraFOV = camera.getFov();
+	api->camera.getPosition(cameraPosition);
+	api->camera.getTarget(cameraTarget);
+	cameraFOV = api->camera.getFov();
 
 	if (ImGui::InputFloat3("Position##camera", cameraPosition, "%.2f", inputflags)) {
-		camera.setPosition(cameraPosition);
-		camera.calculateViewMatrix();
+		api->camera.setPosition(cameraPosition);
+		api->camera.calculateViewMatrix();
 	}
 	if (ImGui::InputFloat3("Target##camera", cameraTarget, "%.2f", inputflags)) {
-		camera.setTarget(cameraTarget);
-		camera.calculateViewMatrix();
+		api->camera.setTarget(cameraTarget);
+		api->camera.calculateViewMatrix();
 	}
 	if (ImGui::DragFloat("FOV##camera", &cameraFOV, 0.5f, 10.0f, 135.0f, "%.1f")) {
-		camera.setFov(cameraFOV);
-		camera.calculateProjectionMatrix();
+		api->camera.setFov(cameraFOV);
+		api->camera.calculateProjectionMatrix();
 	}
 
 
 	if (trackItem == 1) {
-		objects->getPosition(mainObject, cameraTarget);
-		camera.setTargetTrack(cameraTarget);
-		camera.calculateViewMatrix();
+		api->objects.getPosition(mainObject, cameraTarget);
+		api->camera.setTargetTrack(cameraTarget);
+		api->camera.calculateViewMatrix();
 	}
 	else if (trackItem == 2) {
-		objects->getPosition(mainObject, cameraTarget);
-		camera.setTarget(cameraTarget);
-		camera.calculateViewMatrix();
+		api->objects.getPosition(mainObject, cameraTarget);
+		api->camera.setTarget(cameraTarget);
+		api->camera.calculateViewMatrix();
 	}
 
 
@@ -338,12 +491,12 @@ void UI_Model(unsigned int& mainObject) {
 	ImGui::Combo("Source##modelposition", &positionItem, positionItems, IM_ARRAYSIZE(positionItems));
 
 	float modelPosition[3];
-	objects->getPosition(mainObject, modelPosition);
+	api->objects.getPosition(mainObject, modelPosition);
 
 	// case for "Manual" tracking
 	if (positionItem == 0) {
 		if (ImGui::InputFloat3("Position##model", modelPosition, "%.2f", inputflags)) {
-			objects->setPosition(mainObject, modelPosition);
+			api->objects.setPosition(mainObject, modelPosition);
 		}
 	}
 	// case for "Kalman Position" tracking
@@ -353,11 +506,11 @@ void UI_Model(unsigned int& mainObject) {
 		modelPosition[0] = data.position_y;
 		modelPosition[1] = -data.position_z; // - 20
 		modelPosition[2] = -data.position_x;
-		objects->setPosition(mainObject, modelPosition);
+		api->objects.setPosition(mainObject, modelPosition);
 	}
 
 	if (ImGui::Button("Reset Position")) {
-		objects->setPosition(mainObject, threezeros);
+		api->objects.setPosition(mainObject, threezeros);
 	}
 
 	ImGui::Spacing();
@@ -371,12 +524,12 @@ void UI_Model(unsigned int& mainObject) {
 	ImGui::Combo("Source##modelorientation", &orientationItem, orientationItems, IM_ARRAYSIZE(orientationItems));
 
 	float modelOrientation[3];
-	objects->getOrientation(mainObject, modelOrientation);
+	api->objects.getOrientation(mainObject, modelOrientation);
 
 	// case for "Manual" tracking
 	if (orientationItem == 0) {
 		if (ImGui::InputFloat3("Orientation##model", modelOrientation, "%.2f", inputflags)) {
-			objects->setOrientation(mainObject, modelOrientation);
+			api->objects.setOrientation(mainObject, modelOrientation);
 		}
 	}
 	// case for "Kalman Orientation" tracking
@@ -384,18 +537,18 @@ void UI_Model(unsigned int& mainObject) {
 		modelOrientation[0] = data.orientation_x;
 		modelOrientation[1] = data.orientation_y;
 		modelOrientation[2] = data.orientation_z;
-		objects->setOrientation(mainObject, modelOrientation);
+		api->objects.setOrientation(mainObject, modelOrientation);
 	}
 	// case for "Accel-Mag Orientation" tracking
 	else if (orientationItem == 2) {
 		modelOrientation[0] = data.accelmagorientation_x;
 		modelOrientation[1] = data.accelmagorientation_y;
 		modelOrientation[2] = data.accelmagorientation_z;
-		objects->setOrientation(mainObject, modelOrientation);
+		api->objects.setOrientation(mainObject, modelOrientation);
 	}
 
 	if (ImGui::Button("Reset Orientation")) {
-		objects->setOrientation(mainObject, threezeros);
+		api->objects.setOrientation(mainObject, threezeros);
 	}
 
 	ImGui::Spacing();
@@ -403,9 +556,9 @@ void UI_Model(unsigned int& mainObject) {
 	ImGui::Spacing();
 	ImGui::Text("Size");
 
-	static float scale = objects->getScale(mainObject);
+	static float scale = api->objects.getScale(mainObject);
 	if (ImGui::InputFloat("Scale##model", &scale, NULL, NULL, "%.3f", inputflags)) {
-		objects->setScale(mainObject, scale);
+		api->objects.setScale(mainObject, scale);
 	}
 
 	ImGui::Spacing();
@@ -822,10 +975,6 @@ void UI_Parameters() {
 	ImGui::Text("NAV Processor");
 	ImGui::Spacing();
 
-	if (enableWriting) {
-		if (ImGui::Button("Save magnetometer calibration")) serial.start_sendcommand(0x0085);
-	}
-
 	static float kalman_position_uncertainty[3];
 	UI_Vec3TreeNode("Kalman position uncertainty", _KALMAN_POSITION_UNCERTAINTY, kalman_position_uncertainty, enableWriting);
 
@@ -875,6 +1024,10 @@ void UI_Parameters() {
 
 	static float gyro_b[3];
 	UI_Vec3TreeNode("Gyro Cal b", _GYRO_B, gyro_b);
+
+	if (enableWriting) {
+		if (ImGui::Button("Save magnetometer calibration")) serial.start_sendcommand(0x0085);
+	}
 }
 
 

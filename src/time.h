@@ -1,38 +1,48 @@
 #ifndef TIME_H
 #define TIME_H
 
-#include <chrono>
-#include <SDL.h>
-#include <cstdint>
-#include <iostream>
+#include "util.h"
 
+// Class that acts as a configurable rate limiter
 class Timer {
 private:
+	// just improves code readability
 	using clock = std::chrono::steady_clock;
 
-	clock::time_point StartTime = {};
-	clock::duration EnlapsedTime = {};
+	clock::time_point startTime = {};
+	clock::time_point pauseTime = {};
 
-	float frameRateCap = 30;
+	bool paused = false;
 
+	float rateCap = 30;
+
+	// private function returns native C++ duration data type
+	clock::duration getEnlapsedDuration();
 public:
+	// starts the timer at current time.
 	void start();
-
-	clock::duration getEnlapsed();
-	float getEnlapsedFloat();
-	float getEnlapsedFloatMS();
-
+	// initializes start time.
 	void reset();
+	// pause timer;
+	void pause();
+	// resume timer;
+	void resume();
 
-	void setFrameCap(float cap);
-	float getFrameCap();
+	// Returns enlapsed time since timer start.
+	float getEnlapsed();
+	// Returns enlapsed time since timer start
+	// in milliseconds.
+	float getEnlapsedMS();
 
-	void frameDelay();
+	// Applies float rate cap
+	void setRateCap(float cap);
+	// Get the current rate cap. Returns
+	// float in rate per second.
+	float getRateCap();
 
+	// This function will add the necessary delay when called
+	// to pad the frame to the correct time.
+	void delay();
 };
-
-
-extern Timer timer;
-
 
 #endif
