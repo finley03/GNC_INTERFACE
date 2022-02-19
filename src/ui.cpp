@@ -10,6 +10,8 @@
 
 void UI_ConfigureStyle();
 
+void UI_Settings(bool* p_open);
+
 // forward function definitions for main menu
 void UI_MenuBar(SDL_Window* window);
 void UI_MainMenu(SDL_Window* window, unsigned int& mainObject, bool* p_open);
@@ -72,109 +74,6 @@ void UI(SDL_Window* window) {
 	// render user interface
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-
-	//// booleans to track state
-	//static bool show_main_menu = false;
-	//static bool show_telemetry_readout = false;
-	//static bool show_imgui_demo = false;
-	//static bool open_route = false;
-	//static bool show_csys_display = false;
-
-	//// imgui io handler reference
-	//ImGuiIO& io = ImGui::GetIO();
-
-	//// window size information
-	//int windowHeight, windowWidth;
-	//SDL_GetWindowSize(window, &windowWidth, &windowHeight);
-
-	//// remove window size constraint
-	///*ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(2, 2));*/
-
-	//// set constraints on window position and size
-	//ImGui::SetNextWindowPos(ImVec2(0, 0));
-	//// minimum window height is smaller then height of menu therefore minimum menu height applies
-	//ImGui::SetNextWindowSize(ImVec2(windowWidth, 10));
-
-	//bool p_open;
-
-	//// flags for window creation
-	//ImGuiWindowFlags windowflags =
-	//	ImGuiWindowFlags_NoTitleBar |
-	//	ImGuiWindowFlags_NoCollapse |
-	//	ImGuiWindowFlags_NoMove |
-	//	ImGuiWindowFlags_MenuBar |
-	//	ImGuiWindowFlags_NoResize;
-
-	//// remove window minimum size
-	//ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(0, 0));
-	//// begin menu bar
-	//ImGui::Begin("Menu Bar", &p_open, windowflags);
-
-	//ImGui::PopStyleVar();
-
-	////static std::string routeFile;
-	////static std::filesystem::path routeFilePath;
-
-	//if (ImGui::BeginMenuBar()) {
-	//	ImGui::TextUnformatted("Autopilot Interface");
-	//	if (ImGui::BeginMenu("File##menubar")) {
-	//		ImGui::MenuItem("Open Route##menubar", NULL, &open_route);
-	//		ImGui::EndMenu();
-	//	}
-	//	if (ImGui::BeginMenu("View##menubar")) {
-	//		ImGui::MenuItem("Main Menu##menubar", NULL, &show_main_menu);
-	//		ImGui::MenuItem("Telemetry Readout##menubar", NULL, &show_telemetry_readout);
-	//		ImGui::MenuItem("CSYS Display##menubar", NULL, &show_csys_display);
-	//		ImGui::EndMenu();
-	//	}
-	//	if (ImGui::BeginMenu("Debug##menubar")) {
-	//		ImGui::MenuItem("ImGui Demo Window##menubar", NULL, &show_imgui_demo);
-	//		ImGui::EndMenu();
-	//	}
-
-	//	char routeBuffer[64];
-	//	if (routeFile.empty()) {
-	//		sprintf(routeBuffer, "No route open");
-	//	}
-	//	else if (route_data_size >= 0) {
-	//		sprintf(routeBuffer, "Loaded route: %s (%d bytes)", routeFilePath.filename().string().c_str(), route_data_size);
-	//	}
-	//	else {
-	//		sprintf(routeBuffer, "Loaded route: %s", routeFilePath.filename().string().c_str());
-	//	}
-	//	ImGui::SetCursorPosX(ImGui::GetWindowWidth() - ImGui::CalcTextSize(routeBuffer).x - 10);
-	//	ImGui::TextUnformatted(routeBuffer);
-
-	//	ImGui::EndMenuBar();
-	//}
-
-	//if (show_main_menu) UI_MainMenu(window, mainObject, &show_main_menu);
-	//if (show_telemetry_readout) UI_TelemetryReadout(window, &show_telemetry_readout);
-	//if (show_imgui_demo) ImGui::ShowDemoWindow(&show_imgui_demo);
-	//if (show_csys_display) csys->showWindow();
-
-	//if (open_route) {
-	//	bool fileOpened = UI_FSReadDialog(window, routeFile, &open_route, { ".bin", ".txt" }, true);
-	//	if (fileOpened) {
-	//		std::string extension = std::filesystem::path(routeFile).extension().string();
-	//		if (extension == ".bin") {
-	//			binary = true;
-	//			compiled = true;
-	//			readFileToByteArray(routeFile, route_data, route_data_size);
-	//		}
-	//		else if (extension == ".txt") {
-	//			binary = false;
-	//			compiled = false;
-	//			readFileToString(routeFile, fileString);
-	//			route_data_size = -1;
-	//		}
-	//		routeFilePath = std::filesystem::path(routeFile);
-	//		compileLog.clear();
-	//	}
-	//}
-
-	//ImGui::End();
 }
 
 
@@ -185,6 +84,22 @@ void UI_ConfigureStyle() {
 }
 
 
+enum Settings_Enum {
+	Settings_BackgroundColor,
+	Settings_Enum_Size
+};
+
+const char* const settingsText[Settings_Enum_Size] {
+	"Background Color"
+};
+
+
+void UI_Settings(bool* p_open) {
+	ImGui::Begin("Settings", p_open);
+	ImGui::End();
+}
+
+
 void UI_MenuBar(SDL_Window* window) {
 	// booleans to track state
 	static bool show_main_menu = false;
@@ -192,6 +107,7 @@ void UI_MenuBar(SDL_Window* window) {
 	static bool show_imgui_demo = false;
 	static bool open_route = false;
 	static bool show_csys_display = false;
+	static bool show_settings = false;
 
 	// imgui io handler reference
 	ImGuiIO& io = ImGui::GetIO();
@@ -238,6 +154,10 @@ void UI_MenuBar(SDL_Window* window) {
 			ImGui::MenuItem("Main Menu##menubar", NULL, &show_main_menu);
 			ImGui::MenuItem("Telemetry Readout##menubar", NULL, &show_telemetry_readout);
 			ImGui::MenuItem("CSYS Display##menubar", NULL, &show_csys_display);
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Tools##menubar")) {
+			ImGui::MenuItem("Settings##menubar", NULL, &show_settings);
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Debug##menubar")) {
@@ -292,6 +212,7 @@ void UI_MenuBar(SDL_Window* window) {
 	if (show_telemetry_readout) UI_TelemetryReadout(window, &show_telemetry_readout);
 	if (show_imgui_demo) ImGui::ShowDemoWindow(&show_imgui_demo);
 	if (show_csys_display) csys->showWindow();
+	if (show_settings) UI_Settings(&show_settings);
 }
 
 
@@ -363,7 +284,28 @@ void UI_TelemetryReadout(SDL_Window* window, bool* p_open) {
 
 
 void UI_Rendering(unsigned int& mainObject) {
+	static int trackItem = 0;
+
+	float cameraPosition[3], cameraTarget[3], cameraFOV;
+	api->camera.getPosition(cameraPosition);
+	api->camera.getTarget(cameraTarget);
+	cameraFOV = api->camera.getFov();
+
+	if (trackItem == 1) {
+		api->objects.getPosition(mainObject, cameraTarget);
+		api->camera.setTargetTrack(cameraTarget);
+		api->camera.calculateViewMatrix();
+	}
+	else if (trackItem == 2) {
+		api->objects.getPosition(mainObject, cameraTarget);
+		api->camera.setTarget(cameraTarget);
+		api->camera.calculateViewMatrix();
+	}
+
+
+
 	if (!ImGui::CollapsingHeader("Rendering")) return;
+
 
 	ImGui::LabelText("Function", "Value");
 
@@ -428,13 +370,7 @@ void UI_Rendering(unsigned int& mainObject) {
 	
 	// camera tracking selection box
 	const char* trackItems[] = { "None", "Tracking", "Target" };
-	static int trackItem = 0;
 	ImGui::Combo("Tracking##rendering", &trackItem, trackItems, IM_ARRAYSIZE(trackItems));
-
-	float cameraPosition[3], cameraTarget[3], cameraFOV;
-	api->camera.getPosition(cameraPosition);
-	api->camera.getTarget(cameraTarget);
-	cameraFOV = api->camera.getFov();
 
 	if (ImGui::InputFloat3("Position##camera", cameraPosition, "%.2f", inputflags)) {
 		api->camera.setPosition(cameraPosition);
@@ -450,25 +386,12 @@ void UI_Rendering(unsigned int& mainObject) {
 	}
 
 
-	if (trackItem == 1) {
-		api->objects.getPosition(mainObject, cameraTarget);
-		api->camera.setTargetTrack(cameraTarget);
-		api->camera.calculateViewMatrix();
-	}
-	else if (trackItem == 2) {
-		api->objects.getPosition(mainObject, cameraTarget);
-		api->camera.setTarget(cameraTarget);
-		api->camera.calculateViewMatrix();
-	}
-
-
 	ImGui::Spacing();
 }
 
 
 void UI_Model(unsigned int& mainObject) {
-	if (!ImGui::CollapsingHeader("Model")) return;
-
+	// code that always runs
 	// flags for numeric inputs
 	ImGuiInputTextFlags inputflags =
 		ImGuiInputTextFlags_EnterReturnsTrue;
@@ -476,20 +399,7 @@ void UI_Model(unsigned int& mainObject) {
 	// create alias for nav_data_packet.bit
 	Nav_Data_Packet_Type& data = nav_data_packet.bit;
 
-	static float threezeros[3] = { 0 };
-
-
-	ImGui::Text("Model Parameters");
-	ImGui::Spacing();
-	ImGui::Separator();
-	ImGui::Spacing();
-	ImGui::Text("Position");
-
-	// item position
-	const char* positionItems[] = { "Manual", "Kalman Position" };
 	static int positionItem = -1;
-	ImGui::Combo("Source##modelposition", &positionItem, positionItems, IM_ARRAYSIZE(positionItems));
-
 	float modelPosition[3];
 	api->objects.getPosition(mainObject, modelPosition);
 
@@ -509,20 +419,8 @@ void UI_Model(unsigned int& mainObject) {
 		api->objects.setPosition(mainObject, modelPosition);
 	}
 
-	if (ImGui::Button("Reset Position")) {
-		api->objects.setPosition(mainObject, threezeros);
-	}
 
-	ImGui::Spacing();
-	ImGui::Separator();
-	ImGui::Spacing();
-	ImGui::Text("Orientation");
-
-	// item orientation
-	const char* orientationItems[] = { "Manual", "Kalman Orientation", "Accel-Mag Orientation" };
 	static int orientationItem = -1;
-	ImGui::Combo("Source##modelorientation", &orientationItem, orientationItems, IM_ARRAYSIZE(orientationItems));
-
 	float modelOrientation[3];
 	api->objects.getOrientation(mainObject, modelOrientation);
 
@@ -546,6 +444,36 @@ void UI_Model(unsigned int& mainObject) {
 		modelOrientation[2] = data.accelmagorientation_z;
 		api->objects.setOrientation(mainObject, modelOrientation);
 	}
+
+
+	// return if not open
+	if (!ImGui::CollapsingHeader("Model")) return;
+
+
+	ImGui::Text("Model Parameters");
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Spacing();
+	ImGui::Text("Position");
+
+	// item position
+	const char* positionItems[] = { "Manual", "Kalman Position" };
+	ImGui::Combo("Source##modelposition", &positionItem, positionItems, IM_ARRAYSIZE(positionItems));
+
+	static float threezeros[3] = { 0 };
+
+	if (ImGui::Button("Reset Position")) {
+		api->objects.setPosition(mainObject, threezeros);
+	}
+
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Spacing();
+	ImGui::Text("Orientation");
+
+	// item orientation
+	const char* orientationItems[] = { "Manual", "Kalman Orientation", "Accel-Mag Orientation" };
+	ImGui::Combo("Source##modelorientation", &orientationItem, orientationItems, IM_ARRAYSIZE(orientationItems));
 
 	if (ImGui::Button("Reset Orientation")) {
 		api->objects.setOrientation(mainObject, threezeros);
@@ -853,7 +781,7 @@ void UI_Route(SDL_Window* window) {
 	if (!routeFile.empty()) {
 		if (binary) {
 			ImGui::Text("Loaded route: %s (%d bytes)", routeFilePath.filename().string().c_str(), route_data_size);
-			ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Warning: File is a compiled binary,\nviewing and editing are unsupported.");
+			ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Warning: File is a compiled binary.\nViewing, editing, and validation\nare unsupported.");
 		}
 		else {
 			ImGui::Text("Loaded route: %s", routeFilePath.filename().string().c_str());
@@ -1003,10 +931,10 @@ void UI_Parameters() {
 	UI_ScalarTreeNode("Angular velocity variance", _KALMAN_ANGULARVELOCITY_VARIANCE, &kalman_angularvelocity_variance, enableWriting);
 
 	static float gnss_zerolat;
-	UI_ScalarTreeNode_LoadValue("GNSS zero latitude", _KALMAN_GNSS_ZEROLAT, &gnss_zerolat, enableWriting, &(nav_data_packet.bit.latitude), "Load current longitude", "%.06f");
+	UI_ScalarTreeNode_LoadValue("GNSS zero latitude", _KALMAN_GNSS_ZEROLAT, &gnss_zerolat, enableWriting, &(nav_data_packet.bit.latitude), "Load current latitude", "%.06f");
 
 	static float gnss_zerolong;
-	UI_ScalarTreeNode_LoadValue("GNSS zero longitude", _KALMAN_GNSS_ZEROLONG, &gnss_zerolong, enableWriting, &(nav_data_packet.bit.longitude), "Load current latitude", "%.06f");
+	UI_ScalarTreeNode_LoadValue("GNSS zero longitude", _KALMAN_GNSS_ZEROLONG, &gnss_zerolong, enableWriting, &(nav_data_packet.bit.longitude), "Load current longitude", "%.06f");
 
 	static float baro_height_cal;
 	UI_ScalarTreeNode("Barometer height cal", _BARO_HEIGHT_CAL, &baro_height_cal, enableWriting);
@@ -1510,361 +1438,6 @@ void UI_ScalarTreeNode_LoadValue(const char* text, CTRL_Param parameter, float* 
 		ImGui::TreePop();
 	}
 }
-
-
-//// procedure creates a file dialog and returns a file path
-//bool UI_FSReadDialog(SDL_Window* window, std::string& writeback, bool* p_open, const char* extension, bool hideOtherExtensions) {
-//	// get imgui io handler reference (static - only needs to be initialised once)
-//	static ImGuiIO& io = ImGui::GetIO();
-//	// get window size
-//	INT_T windowWidth, windowHeight;
-//	SDL_GetWindowSize(window, &windowWidth, &windowHeight);
-//	// set constraints on window size and position
-//	ImGui::SetNextWindowPos(ImVec2((windowWidth - 500) / 2, (windowHeight - 350) / 2), ImGuiCond_Once);
-//	ImGui::SetNextWindowSize(ImVec2(500, 350), ImGuiCond_Once);
-//	// flags for window
-//	static ImGuiWindowFlags windowflags =
-//		ImGuiWindowFlags_NoCollapse;
-//
-//	// create namespace declaration to reduce code
-//	namespace fs = std::filesystem;
-//
-//	// wether the file has been opened
-//	bool fileOpened = false;
-//	// boolean that tracks whether opening unselected item has been attempted
-//	static bool openAttempt = false;
-//	// static bool that tracks wether extension is valid
-//	static bool invalidExtension = false;
-//
-//	ImGui::Begin("Open##fs", p_open, windowflags);
-//
-//	// get current path
-//	static fs::path path = fs::current_path();
-//	static std::string pathstr = path.string();
-//
-//	// index of item selected
-//	static INT_T selected = -1;
-//
-//	// button for moving to parent directory
-//	if (ImGui::Button("<##fs", ImVec2(25, 0))) {
-//		path = path.parent_path();
-//		pathstr = path.string();
-//		//std::cout << pathstr << "\n";
-//		// reset selected index
-//		selected = -1;
-//	}
-//
-//	ImGui::SameLine();
-//	// show current directory
-//	ImGui::TextColored(ImVec4(0.8f, 0.8f, 1.0f, 1.0f), pathstr.c_str());
-//
-//	// seperator before directory contents
-//	ImGui::Spacing();
-//	ImGui::Separator();
-//	ImGui::Spacing();
-//
-//	static ImGuiSelectableFlags selectflags =
-//		ImGuiSelectableFlags_AllowDoubleClick;
-//
-//	// list directory contents
-//	INT_T index = 0;
-//	static fs::path selectedpath;
-//	// contain within list box
-//	ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
-//	if (ImGui::BeginListBox("##directoryfs", ImVec2(-FLT_MIN, ImGui::GetWindowHeight() - 98))) {
-//		// iterate through items in directory
-//		for (const auto& p : fs::directory_iterator(path)) {
-//			// use one color if item is directory
-//			if (fs::is_directory(p)) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 1.0f, 1.0f));
-//			// if not directory and not selected extension and hideOtherExtensions skip item
-//			else if (hideOtherExtensions && strcmp(extension, p.path().extension().string().c_str()) != 0) continue;
-//			// if file use different color
-//			else ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.9f, 0.9f, 1.0f));
-//			// create selectable element for directory element
-//			if (ImGui::Selectable(p.path().string().erase(0, pathstr.length()).c_str(), selected == index, selectflags)) {
-//				// check if left mouse button clicked twice
-//				if (ImGui::IsMouseDoubleClicked(0)) {
-//					// check if path is directory
-//					if (fs::is_directory(p)) {
-//						path = p.path();
-//						pathstr = path.string();
-//					}
-//					else {
-//						// if file extension is required and extension does not match
-//						if (*extension && strcmp(extension, p.path().extension().string().c_str()) != 0) {
-//							invalidExtension = true;
-//						}
-//						else {
-//							invalidExtension = false;
-//							writeback = p.path().string();
-//							// replace backslashes with forward slashes
-//							// it appears std::ifstream doesn't like them
-//							std::replace(writeback.begin(), writeback.end(), '\\', '/');
-//							// close window
-//							*p_open = false;
-//							fileOpened = true;
-//						}
-//
-//					}
-//					// reset selected
-//					selected = -1;
-//				}
-//				else {
-//					// select item
-//					selected = index;
-//					openAttempt = false;
-//					if (!fs::is_directory(p)) {
-//						selectedpath = p.path();
-//					}
-//				}
-//			}
-//			++index;
-//			ImGui::PopStyleColor();
-//		}
-//		ImGui::EndListBox();
-//	}
-//	ImGui::PopStyleColor();
-//
-//	// spacing before final buttons
-//	ImGui::Spacing();
-//
-//	// display warning message to the user if applicable
-//	// uses else if to only display one message at a time
-//	if (openAttempt) {
-//		ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Please select a file");
-//		ImGui::SameLine();
-//	}
-//	else if (invalidExtension) {
-//		ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Extension must be %s", extension);
-//		ImGui::SameLine();
-//	}
-//
-//	// position cursor to right for buttons
-//	ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 140);
-//
-//	// button to open file
-//	if (ImGui::Button("Open##fs", ImVec2(60, 0))) {
-//		if (selectedpath.empty()) {
-//			openAttempt = true;
-//		}
-//		else {
-//			// if file extension is required
-//			if (*extension && strcmp(extension, selectedpath.extension().string().c_str()) != 0) {
-//				//if (strcmp(extension, selectedpath.extension().string().c_str()) != 0) {
-//				invalidExtension = true;
-//			}
-//			else {
-//				invalidExtension = false;
-//				writeback = selectedpath.string();
-//				std::replace(writeback.begin(), writeback.end(), '\\', '/');
-//				*p_open = false;
-//				fileOpened = true;
-//			}
-//		}
-//	}
-//
-//	// button to cancel opening file
-//	ImGui::SameLine();
-//	if (ImGui::Button("Cancel##fs", ImVec2(60, 0))) {
-//		*p_open = false;
-//		openAttempt = false;
-//	}
-//
-//	ImGui::End();
-//
-//	// if window should close reset some parameters
-//	if (!*p_open) {
-//		selectedpath.clear();
-//		selected = -1;
-//	}
-//
-//	// return true if file found
-//	return fileOpened;
-//}
-//
-//// procedure creates a file dialog and returns a file path
-//bool UI_FSWriteDialog(SDL_Window* window, std::string& writeback, bool* p_open) {
-//	// get imgui io handler reference (static - only needs to be initialised once)
-//	static ImGuiIO& io = ImGui::GetIO();
-//	// get window size
-//	INT_T windowWidth, windowHeight;
-//	SDL_GetWindowSize(window, &windowWidth, &windowHeight);
-//	// set constraints on window size and position
-//	ImGui::SetNextWindowPos(ImVec2((windowWidth - 500) / 2, (windowHeight - 350) / 2), ImGuiCond_Once);
-//	ImGui::SetNextWindowSize(ImVec2(500, 350), ImGuiCond_Once);
-//	// flags for window
-//	static ImGuiWindowFlags windowflags =
-//		ImGuiWindowFlags_NoCollapse;
-//
-//	// create namespace declaration to reduce code
-//	namespace fs = std::filesystem;
-//
-//	// whether the file has been opened
-//	bool fileSaved = false;
-//	// boolean that tracks whether opening unselected item has been attempted
-//	static bool saveAttempt = false;
-//
-//	ImGui::Begin("Save As##fs", p_open, windowflags);
-//
-//	// get current path
-//	static fs::path path = fs::current_path();
-//	static std::string pathstr = path.string();
-//
-//	// index of item selected
-//	static INT_T selected = -1;
-//
-//	// button for moving to parent directory
-//	if (ImGui::Button("<##fs", ImVec2(25, 0))) {
-//		path = path.parent_path();
-//		pathstr = path.string();
-//		//std::cout << pathstr << "\n";
-//		// reset selected index
-//		selected = -1;
-//	}
-//
-//	ImGui::SameLine();
-//	// show current directory
-//	ImGui::TextColored(ImVec4(0.8f, 0.8f, 1.0f, 1.0f), pathstr.c_str());
-//
-//	// seperator before directory contents
-//	ImGui::Spacing();
-//	ImGui::Separator();
-//	ImGui::Spacing();
-//
-//	static ImGuiSelectableFlags selectflags =
-//		ImGuiSelectableFlags_AllowDoubleClick;
-//
-//	// list directory contents
-//	INT_T index = 0;
-//	//static fs::path selectedpath;
-//	// contain within list box
-//	ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
-//	if (ImGui::BeginListBox("##directoryfs", ImVec2(-FLT_MIN, ImGui::GetWindowHeight() - 98))) {
-//		// iterate through items in directory
-//		for (const auto& p : fs::directory_iterator(path)) {
-//			// use one color if item is directory
-//			if (fs::is_directory(p)) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 1.0f, 1.0f));
-//			// if file use different color
-//			else ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.9f, 0.9f, 1.0f));
-//			// create selectable element for directory element
-//			if (ImGui::Selectable(p.path().string().erase(0, pathstr.length()).c_str(), selected == index, selectflags)) {
-//				// check if left mouse button clicked twice
-//				if (ImGui::IsMouseDoubleClicked(0)) {
-//					// check if path is directory
-//					if (fs::is_directory(p)) {
-//						path = p.path();
-//						pathstr = path.string();
-//					}
-//					//else {
-//					//	// if file extension is required and extension does not match
-//					//	if (*extension && strcmp(extension, p.path().extension().string().c_str()) != 0) {
-//					//		invalidExtension = true;
-//					//	}
-//					//	else {
-//					//		invalidExtension = false;
-//					//		writeback = p.path().string();
-//					//		// replace backslashes with forward slashes
-//					//		// it appears std::ifstream doesn't like them
-//					//		std::replace(writeback.begin(), writeback.end(), '\\', '/');
-//					//		// close window
-//					//		*p_open = false;
-//					//		fileOpened = true;
-//					//	}
-//
-//					//}
-//					// reset selected
-//					selected = -1;
-//				}
-//				else {
-//					// select item
-//					selected = index;
-//					saveAttempt = false;
-//					//if (!fs::is_directory(p)) {
-//					//	selectedpath = p.path();
-//					//}
-//				}
-//			}
-//			++index;
-//			ImGui::PopStyleColor();
-//		}
-//		ImGui::EndListBox();
-//	}
-//	ImGui::PopStyleColor();
-//
-//	// spacing before final buttons
-//	ImGui::Spacing();
-//
-//	// display warning message to the user if applicable
-//	// uses else if to only display one message at a time
-//	if (saveAttempt) {
-//		ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Enter File Name");
-//		ImGui::SameLine();
-//	}
-//
-//	ImGui::SetNextItemWidth(ImGui::GetWindowWidth() - 145 - ImGui::GetCursorPosX());
-//
-//	static ImGuiInputTextFlags inputflags =
-//		ImGuiInputTextFlags_EnterReturnsTrue;
-//
-//	static char buffer[260];
-//
-//	//ImGui::InputTextWithHint("##inputfs", "File Name", buffer);
-//
-//	if (ImGui::InputTextWithHint("##inputfs", "File Name", buffer, 260, inputflags)) {
-//		if (strlen(buffer) != 0) {
-//			//selectedpath = path;
-//			//selectedpath.replace_filename(buffer);
-//			writeback = path.string();
-//			writeback.append("/");
-//			writeback.append(buffer);
-//			std::replace(writeback.begin(), writeback.end(), '\\', '/');
-//			fileSaved = true;
-//			*p_open = false;
-//		}
-//		else {
-//			saveAttempt = true;
-//		}
-//	}
-//
-//	ImGui::SameLine();
-//
-//	//// position cursor to right for buttons
-//	//ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 140);
-//
-//	// button to save file
-//	if (ImGui::Button("Save##fs", ImVec2(60, 0))) {
-//		if (strlen(buffer) != 0) {
-//			//selectedpath = path;
-//			//selectedpath.replace_filename(buffer);
-//			writeback = path.string();
-//			writeback.append("/");
-//			writeback.append(buffer);
-//			std::replace(writeback.begin(), writeback.end(), '\\', '/');
-//			fileSaved = true;
-//			*p_open = false;
-//		}
-//		else {
-//			saveAttempt = true;
-//		}
-//	}
-//
-//	// button to cancel saving file
-//	ImGui::SameLine();
-//	if (ImGui::Button("Cancel##fs", ImVec2(60, 0))) {
-//		*p_open = false;
-//		saveAttempt = false;
-//	}
-//
-//	ImGui::End();
-//
-//	// if window should close reset some parameters
-//	if (!*p_open) {
-//		selected = -1;
-//	}
-//
-//	// return true if file found
-//	return fileSaved;
-//}
 
 
 // procedure creates a file dialog and returns a file path

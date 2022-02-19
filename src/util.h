@@ -35,6 +35,7 @@
 #include <filesystem>
 #include <algorithm>
 #include <iterator>
+#include <queue>
 
 #include <SDL.h>
 #undef main

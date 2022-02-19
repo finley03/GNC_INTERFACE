@@ -492,6 +492,14 @@ private:
 	bool timerequest = false;
 	bool timereturned = false;
 
+	bool portBusy = false;
+
+	// bool pointer array for transfer requests
+	std::queue<bool*> timeQueue;
+
+	// number of attempts
+	int resender_attempts = 3;
+
 	// cannot pass variables from local stack to thread so I'll just
 	// put them in the class
 	//uint8_t* write_buffer;
@@ -518,6 +526,8 @@ private:
 	// functions for single actions to share port time with continuous actions
 	void timeRequest();
 	void timeReturn();
+
+	bool check_ack_packet(CTRL_ACK_Packet packet);
 public:
 	bool open_port(const char* port, uint32_t baud);
 

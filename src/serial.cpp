@@ -64,10 +64,10 @@ bool  Serial::open_port(const char* port, uint32_t baud) {
 
 	// create port timeout structure
 	COMMTIMEOUTS port_timeout;
-	// wait 20ms between bytes
+	// wait 50ms between bytes (was 20)
 	// WARNING this value is sensitive to baud rate
 	// low baud rates will likely require a higher value
-	port_timeout.ReadIntervalTimeout = 20;
+	port_timeout.ReadIntervalTimeout = 50;
 	// ignore all other parameters
 	port_timeout.ReadTotalTimeoutMultiplier = 0;
 	port_timeout.ReadTotalTimeoutConstant = 1000;
@@ -150,6 +150,9 @@ bool Serial::write(uint8_t* buffer, uint32_t nr_bytes) {
 		printf("Error writing data to port\n");
 		return false;
 	}
+
+	printf("Written %d/%d bytes\n", bytes, nr_bytes);
+
 	return true;
 }
 
@@ -347,11 +350,23 @@ void Serial::send_command(uint16_t command) {
 	// set serialthread_open flag to true
 	serialthread_open = true;
 
+	Transfer_Request request = createTransferRequest(command);
+
 	timeRequest();
 
-	Transfer_Request request = createTransferRequest(command);
-	write(request.reg, sizeof(request.reg));
-	SDL_Delay(20);
+	int i;
+	for (i = 0; i < resender_attempts; ++i) {
+		if (i) printf("Packet not acknowledged, retrying...\n");
+		write(request.reg, sizeof(request.reg));
+		//SDL_Delay(20);
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		//if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+		//	break;
+		//}
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+		break;
+	}
+	if (i >= resender_attempts) printf("ERROR: Command 0x%04X failed after %d attempts\n", command, i);
 
 	serialthread_done = true;
 	timeReturn();
@@ -363,9 +378,22 @@ void Serial::single_poll(uint16_t command, uint8_t* read_buffer, uint32_t nr_rea
 
 	Transfer_Request request = createTransferRequest(command);
 
-	// poll data from processor
-	write(request.reg, sizeof(request.reg));
-	read(read_buffer, nr_read);
+	timeRequest();
+
+	int i;
+	for (i = 0; i < resender_attempts; ++i) {
+		if (i) printf("CRC error, retrying...\n");
+		// poll data from processor
+		write(request.reg, sizeof(request.reg));
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+		read(read_buffer, nr_read);
+		if (crc32(read_buffer, nr_read) != CRC32_CHECK) continue;
+		break;
+	}
+	if (i >= resender_attempts) printf("ERROR: Packet poll 0x%04X failed after %d attempts\n", command, i);
+
+	timeReturn();
 
 	serialthread_done = true;
 }
@@ -380,17 +408,33 @@ void Serial::continuous_poll(uint16_t command, uint8_t* read_buffer, uint32_t nr
 
 	// continuous polling loop
 	while (continuousthread_open) {
-		if (timerequest) {
-			timerequest = false;
-			while (!timereturned);
-			timereturned = false;
-		}
+		//if (timerequest) {
+		//	timerequest = false;
+		//	while (!timereturned);
+		//	timereturned = false;
+		//}
 
-		// operation fails close the port
-		// the rest of the program will recognise the closed
-		// port
-		if (!write(request.reg, sizeof(request.reg))) close();
-		if (!read(read_buffer, nr_read)) close();
+		timeRequest();
+
+		//// operation fails close the port
+		//// the rest of the program will recognise the closed
+		//// port
+		//if (!write(request.reg, sizeof(request.reg))) close();
+		//if (!read(read_buffer, nr_read)) close();
+		int i;
+		for (i = 0; i < resender_attempts; ++i) {
+			if (i) printf("CRC error, retrying...\n");
+			// poll data from processor
+			write(request.reg, sizeof(request.reg));
+			read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+			if (!check_ack_packet(ctrl_ack_packet)) continue;
+			read(read_buffer, nr_read);
+			if (crc32(read_buffer, nr_read) != CRC32_CHECK) continue;
+			break;
+		}
+		if (i >= resender_attempts) printf("ERROR: Packet poll 0x%04X failed after %d attempts\n", command, i);
+
+		timeReturn();
 
 		threadTimer.setRateCap(rate);
 
@@ -406,19 +450,39 @@ void Serial::eeprom_write_data(uint32_t address, uint8_t data) {
 
 	static Transfer_Request request = createTransferRequest(0x0041);
 
-	write(request.reg, sizeof(request.reg));
-	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
-	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	int i;
+	for (i = 0; i < resender_attempts; ++i) {
+		if (i) printf("CRC error, retrying...");
+		write(request.reg, sizeof(request.reg));
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+		// if successfully acknowledged...
 		EEPROM_Write_Request eeprom_write_request;
 		eeprom_write_request.bit.header = EEPROM_WRITE_REQUEST_HEADER;
 		eeprom_write_request.bit.data = data;
 		eeprom_write_request.bit.address = address;
 		eeprom_write_request.bit.crc = crc32(eeprom_write_request.reg, sizeof(eeprom_write_request.reg) - 4);
 		write(eeprom_write_request.reg, sizeof(eeprom_write_request.reg));
+
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+		// if all successful break from resender loop
+		break;
 	}
-	else {
-		std::cout << "Bad response\n";
-	}
+
+	//write(request.reg, sizeof(request.reg));
+	//read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+	//if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	//	EEPROM_Write_Request eeprom_write_request;
+	//	eeprom_write_request.bit.header = EEPROM_WRITE_REQUEST_HEADER;
+	//	eeprom_write_request.bit.data = data;
+	//	eeprom_write_request.bit.address = address;
+	//	eeprom_write_request.bit.crc = crc32(eeprom_write_request.reg, sizeof(eeprom_write_request.reg) - 4);
+	//	write(eeprom_write_request.reg, sizeof(eeprom_write_request.reg));
+	//}
+	//else {
+	//	std::cout << "Bad response\n";
+	//}
 
 	serialthread_done = true;
 	timeReturn();
@@ -432,22 +496,46 @@ void Serial::eeprom_read_data(uint32_t address, uint8_t* writeback) {
 
 	static Transfer_Request request = createTransferRequest(0x0040);
 
-	write(request.reg, sizeof(request.reg));
-	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
-	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	int i;
+	for (i = 0; i < resender_attempts; ++i) {
+		if (i) printf("CRC error, retrying...");
+		write(request.reg, sizeof(request.reg));
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+		// if successfully acknowledged...
 		EEPROM_Read_Request eeprom_read_request;
 		eeprom_read_request.bit.header = EEPROM_READ_REQUEST_HEADER;
 		eeprom_read_request.bit.address = address;
 		eeprom_read_request.bit.crc = crc32(eeprom_read_request.reg, sizeof(eeprom_read_request.reg) - 4);
 		write(eeprom_read_request.reg, sizeof(eeprom_read_request.reg));
 
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+
 		CTRL_EEPROM_Read_packet eeprom_read_packet;
 		read(eeprom_read_packet.reg, sizeof(eeprom_read_packet.reg));
+		if (crc32(eeprom_read_packet.reg, sizeof(eeprom_read_packet.reg)) != CRC32_CHECK) continue;
 		*writeback = eeprom_read_packet.bit.data;
+		// if all successful break from resender loop
+		break;
 	}
-	else {
-		std::cout << "Bad response\n";
-	}
+
+	//write(request.reg, sizeof(request.reg));
+	//read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+	//if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	//	EEPROM_Read_Request eeprom_read_request;
+	//	eeprom_read_request.bit.header = EEPROM_READ_REQUEST_HEADER;
+	//	eeprom_read_request.bit.address = address;
+	//	eeprom_read_request.bit.crc = crc32(eeprom_read_request.reg, sizeof(eeprom_read_request.reg) - 4);
+	//	write(eeprom_read_request.reg, sizeof(eeprom_read_request.reg));
+
+	//	CTRL_EEPROM_Read_packet eeprom_read_packet;
+	//	read(eeprom_read_packet.reg, sizeof(eeprom_read_packet.reg));
+	//	*writeback = eeprom_read_packet.bit.data;
+	//}
+	//else {
+	//	std::cout << "Bad response\n";
+	//}
 
 	serialthread_done = true;
 	timeReturn();
@@ -463,9 +551,13 @@ void Serial::eeprom_write_n_data(uint32_t address, uint8_t* data, uint8_t size) 
 
 	size = MIN_2(size, 64); // max 64 bytes to write
 
-	write(request.reg, sizeof(request.reg));
-	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
-	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	int i;
+	for (i = 0; i < resender_attempts; ++i) {
+		if (i) printf("CRC error, retrying...");
+		write(request.reg, sizeof(request.reg));
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+		// if successfully acknowledged...
 		EEPROM_Write_N_Request eeprom_write_request;
 		eeprom_write_request.bit.header = EEPROM_WRITE_N_REQUEST_HEADER;
 		for (uint8_t i = 0; i < size; ++i) {
@@ -475,10 +567,29 @@ void Serial::eeprom_write_n_data(uint32_t address, uint8_t* data, uint8_t size) 
 		eeprom_write_request.bit.address = address;
 		eeprom_write_request.bit.crc = crc32(eeprom_write_request.reg, sizeof(eeprom_write_request.reg) - 4);
 		write(eeprom_write_request.reg, sizeof(eeprom_write_request.reg));
+
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+		// if all successful break from resender loop
+		break;
 	}
-	else {
-		std::cout << "Bad response\n";
-	}
+
+	//write(request.reg, sizeof(request.reg));
+	//read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+	//if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	//	EEPROM_Write_N_Request eeprom_write_request;
+	//	eeprom_write_request.bit.header = EEPROM_WRITE_N_REQUEST_HEADER;
+	//	for (uint8_t i = 0; i < size; ++i) {
+	//		eeprom_write_request.bit.data[i] = data[i];
+	//	}
+	//	eeprom_write_request.bit.size = size;
+	//	eeprom_write_request.bit.address = address;
+	//	eeprom_write_request.bit.crc = crc32(eeprom_write_request.reg, sizeof(eeprom_write_request.reg) - 4);
+	//	write(eeprom_write_request.reg, sizeof(eeprom_write_request.reg));
+	//}
+	//else {
+	//	std::cout << "Bad response\n";
+	//}
 
 	serialthread_done = true;
 	timeReturn();
@@ -492,9 +603,13 @@ void Serial::eeprom_read_n_data(uint32_t address, uint8_t* writeback, uint8_t si
 
 	static Transfer_Request request = createTransferRequest(0x0042);
 
-	write(request.reg, sizeof(request.reg));
-	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
-	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	int i;
+	for (i = 0; i < resender_attempts; ++i) {
+		if (i) printf("CRC error, retrying...");
+		write(request.reg, sizeof(request.reg));
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+		// if successfully acknowledged...
 		EEPROM_Read_N_Request eeprom_read_request;
 		eeprom_read_request.bit.header = EEPROM_READ_N_REQUEST_HEADER;
 		eeprom_read_request.bit.address = address;
@@ -502,15 +617,38 @@ void Serial::eeprom_read_n_data(uint32_t address, uint8_t* writeback, uint8_t si
 		eeprom_read_request.bit.crc = crc32(eeprom_read_request.reg, sizeof(eeprom_read_request.reg) - 4);
 		write(eeprom_read_request.reg, sizeof(eeprom_read_request.reg));
 
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+
 		CTRL_EEPROM_Read_N_packet eeprom_read_packet;
 		read(eeprom_read_packet.reg, sizeof(eeprom_read_packet.reg));
+		if (crc32(eeprom_read_packet.reg, sizeof(eeprom_read_packet.reg)) != CRC32_CHECK) continue;
 		for (uint8_t i = 0; i < size; ++i) {
 			writeback[i] = eeprom_read_packet.bit.data[i];
 		}
+		// if all successful break from resender loop
+		break;
 	}
-	else {
-		std::cout << "Bad response\n";
-	}
+
+	//write(request.reg, sizeof(request.reg));
+	//read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+	//if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	//	EEPROM_Read_N_Request eeprom_read_request;
+	//	eeprom_read_request.bit.header = EEPROM_READ_N_REQUEST_HEADER;
+	//	eeprom_read_request.bit.address = address;
+	//	eeprom_read_request.bit.size = size;
+	//	eeprom_read_request.bit.crc = crc32(eeprom_read_request.reg, sizeof(eeprom_read_request.reg) - 4);
+	//	write(eeprom_read_request.reg, sizeof(eeprom_read_request.reg));
+
+	//	CTRL_EEPROM_Read_N_packet eeprom_read_packet;
+	//	read(eeprom_read_packet.reg, sizeof(eeprom_read_packet.reg));
+	//	for (uint8_t i = 0; i < size; ++i) {
+	//		writeback[i] = eeprom_read_packet.bit.data[i];
+	//	}
+	//}
+	//else {
+	//	std::cout << "Bad response\n";
+	//}
 
 	serialthread_done = true;
 	timeReturn();
@@ -524,9 +662,13 @@ void Serial::ctrl_set_vec3(CTRL_Param parameter, float* value) {
 
 	static Transfer_Request request = createTransferRequest(0x0044);
 
-	write(request.reg, sizeof(request.reg));
-	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
-	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	int i;
+	for (i = 0; i < resender_attempts; ++i) {
+		if (i) printf("Request not acknowledged, retrying...");
+		write(request.reg, sizeof(request.reg));
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+		// if successfully acknowledged...
 		Set_Vec3_Request set_request;
 		set_request.bit.header = SET_VEC3_REQUEST_HEADER;
 		set_request.bit.parameter = (uint16_t) parameter;
@@ -535,11 +677,29 @@ void Serial::ctrl_set_vec3(CTRL_Param parameter, float* value) {
 		set_request.bit.data[2] = value[2];
 		set_request.bit.crc = crc32(set_request.reg, sizeof(set_request.reg) - 4);
 		write(set_request.reg, sizeof(set_request.reg));
-		//printf("0x%04x\n0x%08x\n0x%08x\n", set_request.bit.header, set_request.bit.crc, crc32(set_request.reg, sizeof(set_request.reg)));
+
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+		// if all successful break from resender loop
+		break;
 	}
-	else {
-		std::cout << "Bad response\n";
-	}
+
+	//write(request.reg, sizeof(request.reg));
+	//read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+	//if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	//	Set_Vec3_Request set_request;
+	//	set_request.bit.header = SET_VEC3_REQUEST_HEADER;
+	//	set_request.bit.parameter = (uint16_t) parameter;
+	//	set_request.bit.data[0] = value[0];
+	//	set_request.bit.data[1] = value[1];
+	//	set_request.bit.data[2] = value[2];
+	//	set_request.bit.crc = crc32(set_request.reg, sizeof(set_request.reg) - 4);
+	//	write(set_request.reg, sizeof(set_request.reg));
+	//	//printf("0x%04x\n0x%08x\n0x%08x\n", set_request.bit.header, set_request.bit.crc, crc32(set_request.reg, sizeof(set_request.reg)));
+	//}
+	//else {
+	//	std::cout << "Bad response\n";
+	//}
 
 	serialthread_done = true;
 	timeReturn();
@@ -553,24 +713,51 @@ void Serial::ctrl_read_vec3(CTRL_Param parameter, float* writeback) {
 
 	static Transfer_Request request = createTransferRequest(0x0045);
 
-	write(request.reg, sizeof(request.reg));
-	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
-	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	int i;
+	for (i = 0; i < resender_attempts; ++i) {
+		if (i) printf("CRC error, retrying...");
+		write(request.reg, sizeof(request.reg));
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+		// if successfully acknowledged...
 		Read_Vec3_Request read_request;
 		read_request.bit.header = READ_VEC3_REQUEST_HEADER;
 		read_request.bit.parameter = (uint16_t)parameter;
 		read_request.bit.crc = crc32(read_request.reg, sizeof(read_request.reg) - 4);
 		write(read_request.reg, sizeof(read_request.reg));
+
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
 		
 		Read_Vec3_Response read_packet;
 		read(read_packet.reg, sizeof(read_packet.reg));
 		writeback[0] = read_packet.bit.data[0];
 		writeback[1] = read_packet.bit.data[1];
 		writeback[2] = read_packet.bit.data[2];
+
+		if (crc32(read_packet.reg, sizeof(read_packet.reg)) != CRC32_CHECK) continue;
+		// if all successful break from resender loop
+		break;
 	}
-	else {
-		std::cout << "Bad response\n";
-	}
+
+	//write(request.reg, sizeof(request.reg));
+	//read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+	//if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	//	Read_Vec3_Request read_request;
+	//	read_request.bit.header = READ_VEC3_REQUEST_HEADER;
+	//	read_request.bit.parameter = (uint16_t)parameter;
+	//	read_request.bit.crc = crc32(read_request.reg, sizeof(read_request.reg) - 4);
+	//	write(read_request.reg, sizeof(read_request.reg));
+	//	
+	//	Read_Vec3_Response read_packet;
+	//	read(read_packet.reg, sizeof(read_packet.reg));
+	//	writeback[0] = read_packet.bit.data[0];
+	//	writeback[1] = read_packet.bit.data[1];
+	//	writeback[2] = read_packet.bit.data[2];
+	//}
+	//else {
+	//	std::cout << "Bad response\n";
+	//}
 
 	serialthread_done = true;
 	timeReturn();
@@ -584,18 +771,37 @@ void Serial::ctrl_save_vec3(CTRL_Param parameter) {
 
 	static Transfer_Request request = createTransferRequest(0x0046);
 
-	write(request.reg, sizeof(request.reg));
-	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
-	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	int i;
+	for (i = 0; i < resender_attempts; ++i) {
+		if (i) printf("CRC error, retrying...");
+		write(request.reg, sizeof(request.reg));
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+		// if successfully acknowledged...
 		Save_Vec3_Request save_request;
 		save_request.bit.header = SAVE_VEC3_REQUEST_HEADER;
 		save_request.bit.parameter = (uint16_t)parameter;
 		save_request.bit.crc = crc32(save_request.reg, sizeof(save_request.reg) - 4);
 		write(save_request.reg, sizeof(save_request.reg));
+
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+		// if all successful break from resender loop
+		break;
 	}
-	else {
-		std::cout << "Bad response\n";
-	}
+
+	//write(request.reg, sizeof(request.reg));
+	//read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+	//if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	//	Save_Vec3_Request save_request;
+	//	save_request.bit.header = SAVE_VEC3_REQUEST_HEADER;
+	//	save_request.bit.parameter = (uint16_t)parameter;
+	//	save_request.bit.crc = crc32(save_request.reg, sizeof(save_request.reg) - 4);
+	//	write(save_request.reg, sizeof(save_request.reg));
+	//}
+	//else {
+	//	std::cout << "Bad response\n";
+	//}
 
 	serialthread_done = true;
 	timeReturn();
@@ -609,20 +815,40 @@ void Serial::ctrl_set_scalar(CTRL_Param parameter, float* value) {
 
 	static Transfer_Request request = createTransferRequest(0x0047);
 
-	write(request.reg, sizeof(request.reg));
-	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
-	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	int i;
+	for (i = 0; i < resender_attempts; ++i) {
+		if (i) printf("Request not acknowledged, retrying...");
+		write(request.reg, sizeof(request.reg));
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+		// if successfully acknowledged...
 		Set_Scalar_Request set_request;
 		set_request.bit.header = SET_SCALAR_REQUEST_HEADER;
 		set_request.bit.parameter = (uint16_t)parameter;
 		set_request.bit.data = *value;
 		set_request.bit.crc = crc32(set_request.reg, sizeof(set_request.reg) - 4);
 		write(set_request.reg, sizeof(set_request.reg));
-		//printf("0x%04x\n0x%08x\n0x%08x\n", set_request.bit.header, set_request.bit.crc, crc32(set_request.reg, sizeof(set_request.reg)));
+
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+		// if all successful break from resender loop
+		break;
 	}
-	else {
-		std::cout << "Bad response\n";
-	}
+
+	//write(request.reg, sizeof(request.reg));
+	//read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+	//if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	//	Set_Scalar_Request set_request;
+	//	set_request.bit.header = SET_SCALAR_REQUEST_HEADER;
+	//	set_request.bit.parameter = (uint16_t)parameter;
+	//	set_request.bit.data = *value;
+	//	set_request.bit.crc = crc32(set_request.reg, sizeof(set_request.reg) - 4);
+	//	write(set_request.reg, sizeof(set_request.reg));
+	//	//printf("0x%04x\n0x%08x\n0x%08x\n", set_request.bit.header, set_request.bit.crc, crc32(set_request.reg, sizeof(set_request.reg)));
+	//}
+	//else {
+	//	std::cout << "Bad response\n";
+	//}
 
 	serialthread_done = true;
 	timeReturn();
@@ -636,22 +862,47 @@ void Serial::ctrl_read_scalar(CTRL_Param parameter, float* writeback) {
 
 	static Transfer_Request request = createTransferRequest(0x0048);
 
-	write(request.reg, sizeof(request.reg));
-	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
-	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	int i;
+	for (i = 0; i < resender_attempts; ++i) {
+		if (i) printf("CRC error, retrying...");
+		write(request.reg, sizeof(request.reg));
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+		// if successfully acknowledged...
 		Read_Scalar_Request read_request;
 		read_request.bit.header = READ_SCALAR_REQUEST_HEADER;
 		read_request.bit.parameter = (uint16_t)parameter;
 		read_request.bit.crc = crc32(read_request.reg, sizeof(read_request.reg) - 4);
 		write(read_request.reg, sizeof(read_request.reg));
 
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+
 		Read_Scalar_Response read_packet;
 		read(read_packet.reg, sizeof(read_packet.reg));
 		*writeback = read_packet.bit.data;
+
+		if (crc32(read_packet.reg, sizeof(read_packet.reg)) != CRC32_CHECK) continue;
+		// if all successful break from resender loop
+		break;
 	}
-	else {
-		std::cout << "Bad response\n";
-	}
+
+	//write(request.reg, sizeof(request.reg));
+	//read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+	//if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	//	Read_Scalar_Request read_request;
+	//	read_request.bit.header = READ_SCALAR_REQUEST_HEADER;
+	//	read_request.bit.parameter = (uint16_t)parameter;
+	//	read_request.bit.crc = crc32(read_request.reg, sizeof(read_request.reg) - 4);
+	//	write(read_request.reg, sizeof(read_request.reg));
+
+	//	Read_Scalar_Response read_packet;
+	//	read(read_packet.reg, sizeof(read_packet.reg));
+	//	*writeback = read_packet.bit.data;
+	//}
+	//else {
+	//	std::cout << "Bad response\n";
+	//}
 
 	serialthread_done = true;
 	timeReturn();
@@ -665,18 +916,37 @@ void Serial::ctrl_save_scalar(CTRL_Param parameter) {
 
 	static Transfer_Request request = createTransferRequest(0x0049);
 
-	write(request.reg, sizeof(request.reg));
-	read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
-	if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	int i;
+	for (i = 0; i < resender_attempts; ++i) {
+		if (i) printf("CRC error, retrying...");
+		write(request.reg, sizeof(request.reg));
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+		// if successfully acknowledged...
 		Save_Scalar_Request save_request;
 		save_request.bit.header = SAVE_SCALAR_REQUEST_HEADER;
 		save_request.bit.parameter = (uint16_t)parameter;
 		save_request.bit.crc = crc32(save_request.reg, sizeof(save_request.reg) - 4);
 		write(save_request.reg, sizeof(save_request.reg));
+
+		read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+		if (!check_ack_packet(ctrl_ack_packet)) continue;
+		// if all successful break from resender loop
+		break;
 	}
-	else {
-		std::cout << "Bad response\n";
-	}
+
+	//write(request.reg, sizeof(request.reg));
+	//read(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+	//if (ctrl_ack_packet.bit.status_code == CTRL_ACK_OK && crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg)) == CRC32_CHECK) {
+	//	Save_Scalar_Request save_request;
+	//	save_request.bit.header = SAVE_SCALAR_REQUEST_HEADER;
+	//	save_request.bit.parameter = (uint16_t)parameter;
+	//	save_request.bit.crc = crc32(save_request.reg, sizeof(save_request.reg) - 4);
+	//	write(save_request.reg, sizeof(save_request.reg));
+	//}
+	//else {
+	//	std::cout << "Bad response\n";
+	//}
 
 	serialthread_done = true;
 	timeReturn();
@@ -693,18 +963,44 @@ Transfer_Request Serial::createTransferRequest(uint16_t command) {
 
 
 void Serial::timeRequest() {
-	if (continuousthread_open) {
-		// set to true
-		timerequest = true;
-		// wait until reset
-		while (timerequest);
+	//if (continuousthread_open) {
+	//	// set to true
+	//	timerequest = true;
+	//	// wait until reset
+	//	while (timerequest);
+	//}
+
+	if (portBusy) {
+		bool timeGranted = false;
+		timeQueue.push(&timeGranted);
+		while (!timeGranted);
 	}
+
+	portBusy = true;
 }
 
 
 void Serial::timeReturn() {
-	if (continuousthread_open) {
-		timereturned = true;
+	//if (continuousthread_open) {
+	//	timereturned = true;
+	//}
+
+	SDL_Delay(10);
+
+	if (timeQueue.size()) {
+		bool* grant;
+		grant = timeQueue.front();
+		*grant = true;
+		timeQueue.pop();
 	}
-	SDL_Delay(50);
+	else {
+		portBusy = false;
+	}
+
+	//SDL_Delay(50);
+}
+
+
+bool Serial::check_ack_packet(CTRL_ACK_Packet packet) {
+	return (packet.bit.status_code == CTRL_ACK_OK && crc32(packet.reg, sizeof(packet.reg)) == CRC32_CHECK);
 }
