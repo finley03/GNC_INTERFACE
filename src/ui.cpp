@@ -17,6 +17,7 @@ void UI_MenuBar(SDL_Window* window);
 void UI_MainMenu(SDL_Window* window, unsigned int& mainObject, bool* p_open);
 void UI_Rendering(unsigned int& mainObject);
 void UI_Model(unsigned int& mainObject);
+void UI_Model_Tracking(unsigned int& mainObject);
 void UI_SerialPorts();
 void UI_DataPolling();
 void UI_Commands();
@@ -40,6 +41,7 @@ void UI_TableTestInt(const char* text, uint8_t code);
 void UI_Vec3TreeNode(const char* text, CTRL_Param parameter, float* value, bool enableWrite = false, const char* format = "%.3f");
 void UI_ScalarTreeNode(const char* text, CTRL_Param parameter, float* value, bool enableWrite = false, const char* format = "%.3f");
 void UI_ScalarTreeNode_LoadValue(const char* text, CTRL_Param parameter, float* value, bool enableWrite, float* valueptr, const char* buttonText, const char* format = "%.3f");
+void UI_Bool32TreeNode(const char* text, CTRL_Param parameter, int32_t* bools, int numBools, bool enableWrite, const char** boolLabels);
 
 //bool UI_FSReadDialog(SDL_Window* window, std::string& writeback, bool* p_open, const char* extension = "", bool hideOtherExtensions = false);
 bool UI_FSReadDialog(SDL_Window* window, std::string& writeback, bool* p_open, std::vector<const char*> extensions = { "" }, bool hideOtherExtensions = false);
@@ -50,7 +52,7 @@ extern Screen* screen;
 extern Timer* frameTimer;
 extern API* api;
 
-
+// global variables for route compilation
 uint8_t* route_data = nullptr;
 INT_T route_data_size = -1;
 std::string routeFile;
@@ -59,6 +61,10 @@ std::filesystem::path routeFilePath;
 bool binary = false;
 static std::string compileLog;
 bool compiled = false;
+
+// global variables for position and orientation tracking
+static int positionItem = -1;
+static int orientationItem = -1;
 
 
 void UI(SDL_Window* window) {
@@ -213,6 +219,7 @@ void UI_MenuBar(SDL_Window* window) {
 	if (show_imgui_demo) ImGui::ShowDemoWindow(&show_imgui_demo);
 	if (show_csys_display) csys->showWindow();
 	if (show_settings) UI_Settings(&show_settings);
+	UI_Model_Tracking(api->mainObject);
 }
 
 
@@ -391,15 +398,67 @@ void UI_Rendering(unsigned int& mainObject) {
 
 
 void UI_Model(unsigned int& mainObject) {
-	// code that always runs
 	// flags for numeric inputs
 	ImGuiInputTextFlags inputflags =
 		ImGuiInputTextFlags_EnterReturnsTrue;
 
+	// return if not open
+	if (ImGui::CollapsingHeader("Model")) {
+		ImGui::Text("Model Parameters");
+		ImGui::Spacing();
+		ImGui::Separator();
+		ImGui::Spacing();
+		ImGui::Text("Position");
+
+		// item position
+		const char* positionItems[] = { "Manual", "Kalman Position" };
+		ImGui::Combo("Source##modelposition", &positionItem, positionItems, IM_ARRAYSIZE(positionItems));
+
+		static float threezeros[3] = { 0 };
+
+		if (ImGui::Button("Reset Position")) {
+			api->objects.setPosition(mainObject, threezeros);
+		}
+
+		ImGui::Spacing();
+		ImGui::Separator();
+		ImGui::Spacing();
+		ImGui::Text("Orientation");
+
+		// item orientation
+		const char* orientationItems[] = { "Manual", "Kalman Orientation", "Accel-Mag Orientation" };
+		ImGui::Combo("Source##modelorientation", &orientationItem, orientationItems, IM_ARRAYSIZE(orientationItems));
+
+		if (ImGui::Button("Reset Orientation")) {
+			api->objects.setOrientation(mainObject, threezeros);
+		}
+
+		ImGui::Spacing();
+		ImGui::Separator();
+		ImGui::Spacing();
+		ImGui::Text("Size");
+
+		static float scale = api->objects.getScale(mainObject);
+		if (ImGui::InputFloat("Scale##model", &scale, NULL, NULL, "%.3f", inputflags)) {
+			api->objects.setScale(mainObject, scale);
+		}
+
+		ImGui::Spacing();
+	}
+
+
+	// code that always runs
+	//UI_Model_Tracking(mainObject);
+}
+
+
+void UI_Model_Tracking(unsigned int& mainObject) {
+	// flags for numeric inputs
+	ImGuiInputTextFlags inputflags =
+		ImGuiInputTextFlags_EnterReturnsTrue;
 	// create alias for nav_data_packet.bit
 	Nav_Data_Packet_Type& data = nav_data_packet.bit;
 
-	static int positionItem = -1;
 	float modelPosition[3];
 	api->objects.getPosition(mainObject, modelPosition);
 
@@ -420,7 +479,6 @@ void UI_Model(unsigned int& mainObject) {
 	}
 
 
-	static int orientationItem = -1;
 	float modelOrientation[3];
 	api->objects.getOrientation(mainObject, modelOrientation);
 
@@ -444,52 +502,6 @@ void UI_Model(unsigned int& mainObject) {
 		modelOrientation[2] = data.accelmagorientation_z;
 		api->objects.setOrientation(mainObject, modelOrientation);
 	}
-
-
-	// return if not open
-	if (!ImGui::CollapsingHeader("Model")) return;
-
-
-	ImGui::Text("Model Parameters");
-	ImGui::Spacing();
-	ImGui::Separator();
-	ImGui::Spacing();
-	ImGui::Text("Position");
-
-	// item position
-	const char* positionItems[] = { "Manual", "Kalman Position" };
-	ImGui::Combo("Source##modelposition", &positionItem, positionItems, IM_ARRAYSIZE(positionItems));
-
-	static float threezeros[3] = { 0 };
-
-	if (ImGui::Button("Reset Position")) {
-		api->objects.setPosition(mainObject, threezeros);
-	}
-
-	ImGui::Spacing();
-	ImGui::Separator();
-	ImGui::Spacing();
-	ImGui::Text("Orientation");
-
-	// item orientation
-	const char* orientationItems[] = { "Manual", "Kalman Orientation", "Accel-Mag Orientation" };
-	ImGui::Combo("Source##modelorientation", &orientationItem, orientationItems, IM_ARRAYSIZE(orientationItems));
-
-	if (ImGui::Button("Reset Orientation")) {
-		api->objects.setOrientation(mainObject, threezeros);
-	}
-
-	ImGui::Spacing();
-	ImGui::Separator();
-	ImGui::Spacing();
-	ImGui::Text("Size");
-
-	static float scale = api->objects.getScale(mainObject);
-	if (ImGui::InputFloat("Scale##model", &scale, NULL, NULL, "%.3f", inputflags)) {
-		api->objects.setScale(mainObject, scale);
-	}
-
-	ImGui::Spacing();
 }
 
 
@@ -739,8 +751,13 @@ void UI_Commands() {
 	if (ImGui::Button("Calibrate magnetometer")) serial.start_sendcommand(0x0082);
 	ImGui::SameLine();
 	ImGui::Text("(Disables NAV computer polling)");
+	if (ImGui::Button("Calibrate gyro")) serial.start_sendcommand(0x0088);
+	ImGui::SameLine();
+	ImGui::Text("(Disables NAV computer polling)");
 	if (ImGui::Button("Enable Kalman filter")) serial.start_sendcommand(0x0083);
 	if (ImGui::Button("Disable Kalman filter")) serial.start_sendcommand(0x0084);
+	if (ImGui::Button("Enable Kalman Orientation Update")) serial.start_sendcommand(0x0086);
+	if (ImGui::Button("Disable Kalman Orientation Update")) serial.start_sendcommand(0x0087);
 	if (ImGui::Button("Reset Processor##navigation")) serial.start_sendcommand(0x00FF);
 
 	ImGui::Spacing();
@@ -895,8 +912,21 @@ void UI_Parameters() {
 	static float position_pid[3];
 	UI_Vec3TreeNode("Position PID", _POSITION_PID, position_pid, enableWriting);
 
+	static float heading_pid[3];
+	UI_Vec3TreeNode("Heading PID", _HEADING_PID, heading_pid, enableWriting);
+
+	static float altitude_pid[3];
+	UI_Vec3TreeNode("Altitude PID", _ALTITUDE_PID, altitude_pid, enableWriting);
+
 	static float waypoint_threshold;
 	UI_ScalarTreeNode("Waypoint Threshold", _WAYPOINT_THRESHOLD, &waypoint_threshold, enableWriting);
+
+	static float channel_trim[3];
+	UI_Vec3TreeNode("Channel Trim", _CHANNEL_TRIM, channel_trim, enableWriting);
+
+	static int32_t channel_reverse;
+	const char* boolLabels[] = { "Aileron", "Elevator", "Rudder" };
+	UI_Bool32TreeNode("Channel Reverse", _CHANNEL_REVERSE, &channel_reverse, 3, enableWriting, boolLabels);
 
 	ImGui::Spacing();
 	ImGui::Separator();
@@ -955,6 +985,10 @@ void UI_Parameters() {
 
 	if (enableWriting) {
 		if (ImGui::Button("Save magnetometer calibration")) serial.start_sendcommand(0x0085);
+	}
+
+	if (enableWriting) {
+		if (ImGui::Button("Save gyro calibration")) serial.start_vec3savethread(_GYRO_B);
 	}
 }
 
@@ -1433,6 +1467,43 @@ void UI_ScalarTreeNode_LoadValue(const char* text, CTRL_Param parameter, float* 
 		sprintf(buffer, "%s##%sparam", buttonText, text);
 		if (ImGui::Button(buffer)) {
 			*value = *valueptr;
+		}
+
+		ImGui::TreePop();
+	}
+}
+
+
+void UI_Bool32TreeNode(const char* text, CTRL_Param parameter, int32_t* bools, int numBools, bool enableWrite, const char** boolLabels) {
+	char buffer[64];
+	sprintf(buffer, "%s##param", text);
+	if (ImGui::TreeNode(buffer)) {
+		for (int i = 0; i < numBools; ++i) {
+			bool val = (bool)(*bools & (1 << i));
+			if (ImGui::Checkbox(boolLabels[i], &val)) {
+				if (val) {
+					*bools |= (1 << i);
+				}
+				else {
+					*bools &= ~(1 << i);
+				}
+			}
+		}
+		sprintf(buffer, "apply##%sparam", text);
+		if (ImGui::Button(buffer)) {
+			serial.start_scalarsetthread(parameter, (float*)bools);
+		}
+		ImGui::SameLine();
+		sprintf(buffer, "read##%sparam", text);
+		if (ImGui::Button(buffer)) {
+			serial.start_scalarreadthread(parameter, (float*)bools);
+		}
+		if (enableWrite) {
+			ImGui::SameLine();
+			sprintf(buffer, "save##%sparam", text);
+			if (ImGui::Button(buffer)) {
+				serial.start_scalarsavethread(parameter);
+			}
 		}
 
 		ImGui::TreePop();

@@ -167,7 +167,7 @@ bool pushVarData(std::string name, std::string inputfile) {
 #ifndef AUTOPILOT_INTERFACE
 bool assemblefile(std::string inputfile, std::string outputfile) {
 #else
-bool assemblefile(std::string inputfile, std::string filestring, uint8_t*& dataptr, int& datasize) {
+bool assemblefile(std::string inputfile, std::string filestring, uint8_t * &dataptr, int& datasize) {
 #endif
 	//std::cout << inputfile << "\n";
 	//std::cout << outputfile << "\n";
@@ -331,7 +331,7 @@ bool assemblefile(std::string inputfile, std::string filestring, uint8_t*& datap
 			break;
 
 		case 'd':
-			if (strncmp(lineptr, "decrement", 9) == 0) {
+			if (strncmp(lineptr, "decrement", 9) == 0 || strncmp(lineptr, "dec", 3)) {
 				// record line end
 				const char* lineend = strchr(lineptr, '\n');
 				data.push_back(DECREMENT);
@@ -536,7 +536,7 @@ bool assemblefile(std::string inputfile, std::string filestring, uint8_t*& datap
 				std::string intname = std::string(lineptr, size);
 				INT_T index = integers.size();
 				integers[intname] = index;
-				data.push_back((uint8_t) index);
+				data.push_back((uint8_t)index);
 
 				ptrnextvalue(lineptr);
 				// check value is given
@@ -546,10 +546,10 @@ bool assemblefile(std::string inputfile, std::string filestring, uint8_t*& datap
 				}
 				// record value
 				int16_t value = atoi(lineptr);
-				data.push_back((uint8_t) value);
+				data.push_back((uint8_t)value);
 				data.push_back((uint8_t)(value >> 8));
 			}
-			else if (strncmp(lineptr, "increment", 9) == 0) {
+			else if (strncmp(lineptr, "increment", 9) == 0 || strncmp(lineptr, "inc", 3)) {
 				// record line end
 				const char* lineend = strchr(lineptr, '\n');
 				data.push_back(INCREMENT);
@@ -820,7 +820,7 @@ void printHelp() {
 
 
 #ifdef AUTOPILOT_INTERFACE
-void routeasm_get_log(std::string& routeLog) {
+void routeasm_get_log(std::string & routeLog) {
 	routeLog.assign(compileLog);
 }
 #endif
