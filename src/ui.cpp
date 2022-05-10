@@ -41,6 +41,7 @@ void UI_TableTestInt(const char* text, uint8_t code);
 void UI_Vec3TreeNode(const char* text, CTRL_Param parameter, float* value, bool enableWrite = false, const char* format = "%.3f");
 void UI_ScalarTreeNode(const char* text, CTRL_Param parameter, float* value, bool enableWrite = false, const char* format = "%.3f");
 void UI_ScalarTreeNode_LoadValue(const char* text, CTRL_Param parameter, float* value, bool enableWrite, float* valueptr, const char* buttonText, const char* format = "%.3f");
+void UI_IntTreeNode(const char* text, CTRL_Param parameter, int* value, bool enableWrite);
 void UI_Bool32TreeNode(const char* text, CTRL_Param parameter, int32_t* bools, int numBools, bool enableWrite, const char** boolLabels);
 
 //bool UI_FSReadDialog(SDL_Window* window, std::string& writeback, bool* p_open, const char* extension = "", bool hideOtherExtensions = false);
@@ -65,6 +66,13 @@ bool compiled = false;
 // global variables for position and orientation tracking
 static int positionItem = -1;
 static int orientationItem = -1;
+
+static int flightMode = -1;
+static const char* flightModeNames[] = {
+	"Manual",
+	"Manual heading-hold",
+	"Auto waypoint"
+};
 
 
 void UI(SDL_Window* window) {
@@ -404,6 +412,7 @@ void UI_Model(unsigned int& mainObject) {
 
 	// return if not open
 	if (ImGui::CollapsingHeader("Model")) {
+	//if (ImGui::CollapsingHeader("Model")) {
 		ImGui::Text("Model Parameters");
 		ImGui::Spacing();
 		ImGui::Separator();
@@ -734,6 +743,20 @@ void UI_Commands() {
 	ImGui::Separator();
 	ImGui::Spacing();
 
+	ImGui::Combo("Flight Mode##commands", &flightMode, flightModeNames, IM_ARRAYSIZE(flightModeNames));
+	char buffer[32];
+	if (flightMode != -1) {
+		sprintf(buffer, "apply##flightmode");
+		if (ImGui::Button(buffer)) {
+			serial.start_scalarsetthread(_FLIGHT_MODE, (float*)&flightMode);
+		}
+		ImGui::SameLine();
+	}
+	sprintf(buffer, "read##flightmode");
+	if (ImGui::Button(buffer)) {
+		serial.start_scalarreadthread(_FLIGHT_MODE, (float*)&flightMode);
+	}
+
 	if (ImGui::Button("Arm Motor")) serial.start_sendcommand(0x0005);
 	if (ImGui::Button("Disarm Motor")) serial.start_sendcommand(0x0006);
 	if (ImGui::Button("Start Guidance")) serial.start_sendcommand(0x0003);
@@ -927,6 +950,11 @@ void UI_Parameters() {
 	static int32_t channel_reverse;
 	const char* boolLabels[] = { "Aileron", "Elevator", "Rudder" };
 	UI_Bool32TreeNode("Channel Reverse", _CHANNEL_REVERSE, &channel_reverse, 3, enableWriting, boolLabels);
+
+	static float elev_turn_p;
+	UI_ScalarTreeNode("Elevator Turn P", _ELEVATOR_TURN_P, &elev_turn_p, enableWriting);
+
+	UI_IntTreeNode("Flight Mode", _FLIGHT_MODE, &flightMode, enableWriting);
 
 	ImGui::Spacing();
 	ImGui::Separator();
@@ -1467,6 +1495,34 @@ void UI_ScalarTreeNode_LoadValue(const char* text, CTRL_Param parameter, float* 
 		sprintf(buffer, "%s##%sparam", buttonText, text);
 		if (ImGui::Button(buffer)) {
 			*value = *valueptr;
+		}
+
+		ImGui::TreePop();
+	}
+}
+
+
+void UI_IntTreeNode(const char* text, CTRL_Param parameter, int* value, bool enableWrite) {
+	char buffer[64];
+	sprintf(buffer, "%s##param", text);
+	if (ImGui::TreeNode(buffer)) {
+		sprintf(buffer, "value##%sparam", text);
+		ImGui::InputInt(buffer, value, NULL, NULL);
+		sprintf(buffer, "apply##%sparam", text);
+		if (ImGui::Button(buffer)) {
+			serial.start_scalarsetthread(parameter, (float*)value);
+		}
+		ImGui::SameLine();
+		sprintf(buffer, "read##%sparam", text);
+		if (ImGui::Button(buffer)) {
+			serial.start_scalarreadthread(parameter, (float*)value);
+		}
+		if (enableWrite) {
+			ImGui::SameLine();
+			sprintf(buffer, "save##%sparam", text);
+			if (ImGui::Button(buffer)) {
+				serial.start_scalarsavethread(parameter);
+			}
 		}
 
 		ImGui::TreePop();
