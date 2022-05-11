@@ -948,13 +948,20 @@ void UI_Parameters() {
 	UI_Vec3TreeNode("Channel Trim", _CHANNEL_TRIM, channel_trim, enableWriting);
 
 	static int32_t channel_reverse;
-	const char* boolLabels[] = { "Aileron", "Elevator", "Rudder" };
-	UI_Bool32TreeNode("Channel Reverse", _CHANNEL_REVERSE, &channel_reverse, 3, enableWriting, boolLabels);
+	const char* channelReverseLabels[] = { "Aileron", "Elevator", "Rudder" };
+	UI_Bool32TreeNode("Channel Reverse", _CHANNEL_REVERSE, &channel_reverse, 3, enableWriting, channelReverseLabels);
 
 	static float elev_turn_p;
 	UI_ScalarTreeNode("Elevator Turn P", _ELEVATOR_TURN_P, &elev_turn_p, enableWriting);
 
 	UI_IntTreeNode("Flight Mode", _FLIGHT_MODE, &flightMode, enableWriting);
+
+	static float disable_kalman_update_delay;
+	UI_ScalarTreeNode("Kalman update disable time after waypoint", _DISABLE_KALMAN_UPDATE_DELAY, &disable_kalman_update_delay, enableWriting);
+
+	static int32_t ctrl_flags_1;
+	const char* ctrlFlagLabels[] = { "Disable kalman update during turns" };
+	UI_Bool32TreeNode("CTRL Flags 1", _CTRL_FLAGS_1, &ctrl_flags_1, 1, enableWriting, ctrlFlagLabels);
 
 	ImGui::Spacing();
 	ImGui::Separator();
