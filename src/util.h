@@ -113,6 +113,9 @@ typedef float FLT_T;
 #define ARRLEN(a) (sizeof(a)/sizeof(a[0]))
 #define STRLEN(s) (ARRLEN(s)-1)
 
+//#define radians(x) ((x) * 0.01745329251994329576923690768489)
+//#define degrees(x) ((x) * 57.295779513082320876798154814105)
+
 typedef union {
 	float value;
 

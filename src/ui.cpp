@@ -951,6 +951,15 @@ void UI_Parameters() {
 	const char* channelReverseLabels[] = { "Aileron", "Elevator", "Rudder" };
 	UI_Bool32TreeNode("Channel Reverse", _CHANNEL_REVERSE, &channel_reverse, 3, enableWriting, channelReverseLabels);
 
+	static float angle_of_attack;
+	UI_ScalarTreeNode("Angle of Attack", _AOA, &angle_of_attack, enableWriting);
+
+	static float roll_limit;
+	UI_ScalarTreeNode("Roll Limit", _ROLL_LIMIT, &roll_limit, enableWriting);
+
+	static float pitch_limit;
+	UI_ScalarTreeNode("Pitch Limit", _PITCH_LIMIT, &pitch_limit, enableWriting);
+
 	static float elev_turn_p;
 	UI_ScalarTreeNode("Elevator Turn P", _ELEVATOR_TURN_P, &elev_turn_p, enableWriting);
 
