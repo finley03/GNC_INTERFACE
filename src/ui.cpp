@@ -67,11 +67,14 @@ bool compiled = false;
 static int positionItem = -1;
 static int orientationItem = -1;
 
-static int flightMode = -1;
+static int flightMode = -1, flightMode0 = -1, flightMode1 = -1, flightMode2 = -1;
 static const char* flightModeNames[] = {
 	"Manual",
-	"Manual heading-hold",
-	"Auto waypoint"
+	"Fly-by-wire",
+	"Fly-by-wire Hold",
+	"Auto",
+	"Loiter",
+	"Return-to-launch"
 };
 
 
@@ -757,8 +760,50 @@ void UI_Commands() {
 		serial.start_scalarreadthread(_FLIGHT_MODE, (float*)&flightMode);
 	}
 
-	if (ImGui::Button("Arm Motor")) serial.start_sendcommand(0x0005);
-	if (ImGui::Button("Disarm Motor")) serial.start_sendcommand(0x0006);
+	ImGui::Combo("Flight Mode 0##commands", &flightMode0, flightModeNames, IM_ARRAYSIZE(flightModeNames));
+	char buffer0[32];
+	if (flightMode0 != -1) {
+		sprintf(buffer0, "apply##flightmode0");
+		if (ImGui::Button(buffer0)) {
+			serial.start_scalarsetthread(_FLIGHT_MODE_0, (float*)&flightMode0);
+		}
+		ImGui::SameLine();
+	}
+	sprintf(buffer0, "read##flightmode0");
+	if (ImGui::Button(buffer0)) {
+		serial.start_scalarreadthread(_FLIGHT_MODE_0, (float*)&flightMode0);
+	}
+
+	ImGui::Combo("Flight Mode 1##commands", &flightMode1, flightModeNames, IM_ARRAYSIZE(flightModeNames));
+	char buffer1[32];
+	if (flightMode1 != -1) {
+		sprintf(buffer1, "apply##flightmode1");
+		if (ImGui::Button(buffer1)) {
+			serial.start_scalarsetthread(_FLIGHT_MODE_1, (float*)&flightMode1);
+		}
+		ImGui::SameLine();
+	}
+	sprintf(buffer1, "read##flightmode1");
+	if (ImGui::Button(buffer1)) {
+		serial.start_scalarreadthread(_FLIGHT_MODE_1, (float*)&flightMode1);
+	}
+
+	ImGui::Combo("Flight Mode 2##commands", &flightMode2, flightModeNames, IM_ARRAYSIZE(flightModeNames));
+	char buffer2[32];
+	if (flightMode2 != -1) {
+		sprintf(buffer2, "apply##flightmode2");
+		if (ImGui::Button(buffer2)) {
+			serial.start_scalarsetthread(_FLIGHT_MODE_2, (float*)&flightMode2);
+		}
+		ImGui::SameLine();
+	}
+	sprintf(buffer2, "read##flightmode2");
+	if (ImGui::Button(buffer2)) {
+		serial.start_scalarreadthread(_FLIGHT_MODE_2, (float*)&flightMode2);
+	}
+
+	if (ImGui::Button("Arm")) serial.start_sendcommand(0x0005);
+	if (ImGui::Button("Disarm")) serial.start_sendcommand(0x0006);
 	if (ImGui::Button("Start Guidance")) serial.start_sendcommand(0x0003);
 	if (ImGui::Button("Stop Guidance")) serial.start_sendcommand(0x0004);
 	if (ImGui::Button("Reset Guidance")) serial.start_sendcommand(0x0002);
@@ -971,6 +1016,12 @@ void UI_Parameters() {
 	static int32_t ctrl_flags_1;
 	const char* ctrlFlagLabels[] = { "Disable kalman update during turns" };
 	UI_Bool32TreeNode("CTRL Flags 1", _CTRL_FLAGS_1, &ctrl_flags_1, 1, enableWriting, ctrlFlagLabels);
+
+	UI_IntTreeNode("Flight Mode 0", _FLIGHT_MODE_0, &flightMode0, enableWriting);
+
+	UI_IntTreeNode("Flight Mode 1", _FLIGHT_MODE_1, &flightMode1, enableWriting);
+
+	UI_IntTreeNode("Flight Mode 2", _FLIGHT_MODE_2, &flightMode2, enableWriting);
 
 	ImGui::Spacing();
 	ImGui::Separator();
