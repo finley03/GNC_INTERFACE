@@ -1014,14 +1014,20 @@ void UI_Parameters() {
 	UI_ScalarTreeNode("Kalman update disable time after waypoint", _DISABLE_KALMAN_UPDATE_DELAY, &disable_kalman_update_delay, enableWriting);
 
 	static int32_t ctrl_flags_1;
-	const char* ctrlFlagLabels[] = { "Disable kalman update during turns" };
-	UI_Bool32TreeNode("CTRL Flags 1", _CTRL_FLAGS_1, &ctrl_flags_1, 1, enableWriting, ctrlFlagLabels);
+	const char* ctrlFlagLabels[] = { "Disable kalman update during turns", "Loiter clockwise" };
+	UI_Bool32TreeNode("CTRL Flags 1", _CTRL_FLAGS_1, &ctrl_flags_1, 2, enableWriting, ctrlFlagLabels);
 
 	UI_IntTreeNode("Flight Mode 0", _FLIGHT_MODE_0, &flightMode0, enableWriting);
 
 	UI_IntTreeNode("Flight Mode 1", _FLIGHT_MODE_1, &flightMode1, enableWriting);
 
 	UI_IntTreeNode("Flight Mode 2", _FLIGHT_MODE_2, &flightMode2, enableWriting);
+
+	static float loiter_radius;
+	UI_ScalarTreeNode("Loiter Radius", _LOITER_RADIUS, &loiter_radius, enableWriting);
+
+	static float home_loiter_alt;
+	UI_ScalarTreeNode("Home Loiter Altitude", _HOME_LOITER_ALT, &home_loiter_alt, enableWriting);
 
 	ImGui::Spacing();
 	ImGui::Separator();
