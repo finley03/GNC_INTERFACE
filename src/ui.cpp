@@ -74,7 +74,8 @@ static const char* flightModeNames[] = {
 	"Fly-by-wire Hold",
 	"Auto",
 	"Loiter",
-	"Return-to-launch"
+	"Return-to-launch",
+	"Launch"
 };
 
 
@@ -1014,7 +1015,7 @@ void UI_Parameters() {
 	UI_ScalarTreeNode("Kalman update disable time after waypoint", _DISABLE_KALMAN_UPDATE_DELAY, &disable_kalman_update_delay, enableWriting);
 
 	static int32_t ctrl_flags_1;
-	const char* ctrlFlagLabels[] = { "Disable kalman update during turns", "Loiter clockwise" };
+	const char* ctrlFlagLabels[] = { "Disable kalman update during turns", "Loiter anticlockwise" };
 	UI_Bool32TreeNode("CTRL Flags 1", _CTRL_FLAGS_1, &ctrl_flags_1, 2, enableWriting, ctrlFlagLabels);
 
 	UI_IntTreeNode("Flight Mode 0", _FLIGHT_MODE_0, &flightMode0, enableWriting);
@@ -1028,6 +1029,14 @@ void UI_Parameters() {
 
 	static float home_loiter_alt;
 	UI_ScalarTreeNode("Home Loiter Altitude", _HOME_LOITER_ALT, &home_loiter_alt, enableWriting);
+
+	static float launch_thro, launch_pitch, launch_minacc, launch_minspd, launch_throdelay, launch_time;
+	UI_ScalarTreeNode("Launch Throttle", _LAUNCH_THRO, &launch_thro, enableWriting);
+	UI_ScalarTreeNode("Launch Pitch", _LAUNCH_PITCH, &launch_pitch, enableWriting);
+	UI_ScalarTreeNode("Launch Min Accel", _LAUNCH_MINACC, &launch_minacc, enableWriting);
+	UI_ScalarTreeNode("Launch Min Speed", _LAUNCH_MINSPD, &launch_minspd, enableWriting);
+	UI_ScalarTreeNode("Launch Delay", _LAUNCH_THRODELAY, &launch_throdelay, enableWriting);
+	UI_ScalarTreeNode("Launch Time", _LAUNCH_TIME, &launch_time, enableWriting);
 
 	ImGui::Spacing();
 	ImGui::Separator();
