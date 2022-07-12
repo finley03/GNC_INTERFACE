@@ -1038,6 +1038,16 @@ void UI_Parameters() {
 	UI_ScalarTreeNode("Launch Delay", _LAUNCH_THRODELAY, &launch_throdelay, enableWriting);
 	UI_ScalarTreeNode("Launch Time", _LAUNCH_TIME, &launch_time, enableWriting);
 
+	static float fbwh_heading_slew, fbwh_altitude_slew;
+	UI_ScalarTreeNode("FBWH heading slew rate", _FBWH_HEADING_SLEW, &fbwh_heading_slew, enableWriting);
+	UI_ScalarTreeNode("FBWH altitude slew rate", _FBWH_ALTITUDE_SLEW, &fbwh_altitude_slew, enableWriting);
+
+	static float landing_descent_pitch, landing_flair_pitch, landing_descent_throttle, landing_flair_param;
+	UI_ScalarTreeNode("Land descent pitch", _LANDING_DESCENT_PITCH, &landing_descent_pitch, enableWriting);
+	UI_ScalarTreeNode("Land flair pitch", _LANDING_FLAIR_PITCH, &landing_flair_pitch, enableWriting);
+	UI_ScalarTreeNode("Land descent throttle", _LANDING_DESCENT_THROTTLE, &landing_descent_throttle, enableWriting);
+	UI_ScalarTreeNode("Land flair param", _LANDING_FLAIR_PARAM, &landing_flair_param, enableWriting);
+
 	ImGui::Spacing();
 	ImGui::Separator();
 	ImGui::Text("NAV Processor");
