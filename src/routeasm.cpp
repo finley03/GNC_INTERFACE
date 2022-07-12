@@ -617,7 +617,8 @@ bool assemblefile(std::string inputfile, std::string filestring, uint8_t * &data
 			break;
 
 		case 'l':
-			if (strncmp(lineptr, "launch", 6) == 0 && (*(lineptr + 6) == '\n' || *(lineptr + 6) == '\0' || *(lineptr + 6) == ' ' || *(lineptr + 6) == ';')) data.push_back(LAUNCH);
+			if (strncmp(lineptr, "launch", 6) == 0) data.push_back(LAUNCH);
+			else if (strncmp(lineptr, "land", 4) == 0 && (*(lineptr + 4) == '\n' || *(lineptr + 4) == '\0' || *(lineptr + 4) == ' ' || *(lineptr + 4) == ';')) data.push_back(LAND);
 			else {
 				unknown(inputpath, linenumber);
 				return false;

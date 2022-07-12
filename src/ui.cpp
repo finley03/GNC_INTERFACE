@@ -75,7 +75,8 @@ static const char* flightModeNames[] = {
 	"Auto",
 	"Loiter",
 	"Return-to-launch",
-	"Launch"
+	"Launch",
+	"Land"
 };
 
 
