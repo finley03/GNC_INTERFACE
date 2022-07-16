@@ -67,7 +67,7 @@ bool compiled = false;
 static int positionItem = -1;
 static int orientationItem = -1;
 
-static int flightMode = -1, flightMode0 = -1, flightMode1 = -1, flightMode2 = -1;
+static int flightMode = -1, flightMode0 = -1, flightMode1 = -1, flightMode2 = -1, failsafeFlightMode = -1;
 static const char* flightModeNames[] = {
 	"Manual",
 	"Fly-by-wire",
@@ -804,6 +804,20 @@ void UI_Commands() {
 		serial.start_scalarreadthread(_FLIGHT_MODE_2, (float*)&flightMode2);
 	}
 
+	ImGui::Combo("Failsafe Flight Mode##commands", &failsafeFlightMode, flightModeNames, IM_ARRAYSIZE(flightModeNames));
+	char buffer3[32];
+	if (failsafeFlightMode != -1) {
+		sprintf(buffer3, "apply##failsafeflightmode");
+		if (ImGui::Button(buffer3)) {
+			serial.start_scalarsetthread(_FAILSAFE_FLIGHT_MODE, (float*)&failsafeFlightMode);
+		}
+		ImGui::SameLine();
+	}
+	sprintf(buffer3, "read##failsafeflightmode");
+	if (ImGui::Button(buffer3)) {
+		serial.start_scalarreadthread(_FAILSAFE_FLIGHT_MODE, (float*)&failsafeFlightMode);
+	}
+
 	if (ImGui::Button("Arm")) serial.start_sendcommand(0x0005);
 	if (ImGui::Button("Disarm")) serial.start_sendcommand(0x0006);
 	if (ImGui::Button("Start Guidance")) serial.start_sendcommand(0x0003);
@@ -1016,14 +1030,16 @@ void UI_Parameters() {
 	UI_ScalarTreeNode("Kalman update disable time after waypoint", _DISABLE_KALMAN_UPDATE_DELAY, &disable_kalman_update_delay, enableWriting);
 
 	static int32_t ctrl_flags_1;
-	const char* ctrlFlagLabels[] = { "Disable kalman update during turns", "Loiter anticlockwise" };
-	UI_Bool32TreeNode("CTRL Flags 1", _CTRL_FLAGS_1, &ctrl_flags_1, 2, enableWriting, ctrlFlagLabels);
+	const char* ctrlFlagLabels[] = { "DEPRECATED: Disable kalman update during turns", "Loiter anticlockwise", "Disarm on failsafe"};
+	UI_Bool32TreeNode("CTRL Flags 1", _CTRL_FLAGS_1, &ctrl_flags_1, 3, enableWriting, ctrlFlagLabels);
 
 	UI_IntTreeNode("Flight Mode 0", _FLIGHT_MODE_0, &flightMode0, enableWriting);
 
 	UI_IntTreeNode("Flight Mode 1", _FLIGHT_MODE_1, &flightMode1, enableWriting);
 
 	UI_IntTreeNode("Flight Mode 2", _FLIGHT_MODE_2, &flightMode2, enableWriting);
+
+	UI_IntTreeNode("Failsafe Flight Mode", _FAILSAFE_FLIGHT_MODE, &failsafeFlightMode, enableWriting);
 
 	static float loiter_radius;
 	UI_ScalarTreeNode("Loiter Radius", _LOITER_RADIUS, &loiter_radius, enableWriting);

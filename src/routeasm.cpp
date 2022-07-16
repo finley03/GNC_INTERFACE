@@ -810,6 +810,14 @@ bool assemblefile(std::string inputfile, std::string filestring, uint8_t * &data
 			}
 			break;
 
+		case 'r':
+			if (strncmp(lineptr, "rtl", 3) == 0 && (*(lineptr + 3) == '\n' || *(lineptr + 3) == '\0' || *(lineptr + 3) == ' ' || *(lineptr + 3) == ';')) data.push_back(RTL);
+			else {
+				unknown(inputpath, linenumber);
+				return false;
+			}
+			break;
+
 		case 's':
 			if (strncmp(lineptr, "sub_assign", 10) == 0) {
 				// record line end
